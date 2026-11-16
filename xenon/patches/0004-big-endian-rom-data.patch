@@ -255,6 +255,23 @@ index 7209f94..1f1689a 100644
      /* The decompressed point table is a byte-exact big-endian N64 image, but
       * every consumer (gfx_sp_vertex, the vtx-batch bounds builder, the
       * shot-impact bbox walker) reads Vtx fields natively, so all six s16s per
+diff --git a/src/game/bgfog.c b/src/game/bgfog.c
+index 9b2741b..ca2d28c 100644
+--- a/src/game/bgfog.c
++++ b/src/game/bgfog.c
+@@ -622,6 +622,12 @@ void fogSwitchToSolosky2(f32 arg0)
+ {
+     static EnvironmentRecord static_envr;
+ 
++#ifndef TARGET_N64
++    /* levels using fog_tables2 never set these; N64 read NULL harmlessly */
++    if (g_EnvironmentMainp == NULL || g_EnvironmentAltp == NULL) {
++        return;
++    }
++#endif
+     static_envr = *g_EnvironmentMainp;
+ 
+     static_envr.Visibility.BlendMultiplier =
 diff --git a/src/game/bondview.h b/src/game/bondview.h
 index c7e993f..0613ade 100644
 --- a/src/game/bondview.h
