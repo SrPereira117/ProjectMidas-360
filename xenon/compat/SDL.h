@@ -8,7 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
+int strcasecmp(const char *, const char *);
+int strncasecmp(const char *, const char *, size_t);
 #include <time.h>
 
 #ifdef __cplusplus

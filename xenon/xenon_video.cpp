@@ -12,6 +12,7 @@
 #include <ctime>
 #include <vector>
 
+#include <PR/gbi.h>
 #include "gfx_api.h"
 #include "gfx_cc.h"
 #include "gfx_sdl.h"
