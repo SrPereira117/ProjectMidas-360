@@ -93,6 +93,11 @@ function(port_add_asset_direct src sym)
     if(NOT sym IN_LIST KEEP_SYMS)
         return()
     endif()
+    # Esses modelos nao estao no repositorio do Midas: sao extraidos da ROM do usuario na hora de compilar.
+    if(NOT EXISTS ${MIDAS_DIR}/${src})
+        message(STATUS "asset ${sym}: ${src} ausente (vem da ROM), pulando")
+        return()
+    endif()
     set(obj ${ASSET_OBJ_DIR}/${sym}.o)
     add_custom_command(OUTPUT ${obj}
         COMMAND ${CMAKE_C_COMPILER} ${ASSET_C_FLAGS} -c ${MIDAS_DIR}/${src} -o ${obj}.raw
@@ -103,6 +108,11 @@ endfunction()
 
 function(port_add_asset_seg src sym)
     if(NOT sym IN_LIST KEEP_SYMS)
+        return()
+    endif()
+    # Esses modelos nao estao no repositorio do Midas: sao extraidos da ROM do usuario na hora de compilar.
+    if(NOT EXISTS ${MIDAS_DIR}/${src})
+        message(STATUS "asset ${sym}: ${src} ausente (vem da ROM), pulando")
         return()
     endif()
     set(obj ${ASSET_OBJ_DIR}/${sym}.o)
