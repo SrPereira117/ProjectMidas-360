@@ -135,10 +135,23 @@ index 5df8e99..bcfd4de 100644
  #define _mkword(a, b)             ((a << 16) | (b & 0xffff))
  #else
 diff --git a/src/game/bg.c b/src/game/bg.c
-index 7209f94..38df674 100644
+index 7209f94..1f1689a 100644
 --- a/src/game/bg.c
 +++ b/src/game/bg.c
-@@ -1092,8 +1092,17 @@ void load_bg_file(LEVEL_INDEX levelid)
+@@ -355,7 +355,12 @@ void sub_GAME_7F0B37EC(void) {
+     u32 masked;
+ 
+     ptr = (u8 *)specialportalarray;
++#ifdef TARGET_N64
+     end = (u8 *)&g_BgCurrentRoom;
++#else
++    /* the N64 relied on g_BgCurrentRoom following the table in memory; the end is the table's own */
++    end = (u8 *)specialportalarray + sizeof(specialportalarray);
++#endif
+ 
+     do {
+         if (levelentry_index == *ptr++) {
+@@ -1092,8 +1097,17 @@ void load_bg_file(LEVEL_INDEX levelid)
      }
  #endif
  
@@ -156,7 +169,7 @@ index 7209f94..38df674 100644
   
      sub_GAME_7F0B4810(levelinfotable[levelentry_index].levelscale);
      setLevelScale(levelinfotable[levelentry_index].levelscale);
-@@ -1105,6 +1114,9 @@ void load_bg_file(LEVEL_INDEX levelid)
+@@ -1105,6 +1119,9 @@ void load_bg_file(LEVEL_INDEX levelid)
      sub_GAME_7F08976C(mCurrentLevelVisibilityScale);
      matrix_4x4_7F058C4C(mCurrentLevelVisibilityScale);
   
@@ -166,7 +179,7 @@ index 7209f94..38df674 100644
      data = (s32 *)ptr_bg_data;
      dword_CODE_bss_8007BF98 = *data;
      dword_CODE_bss_8007FF88 = 1;
-@@ -1257,12 +1269,24 @@ void load_bg_file(LEVEL_INDEX levelid)
+@@ -1257,12 +1274,24 @@ void load_bg_file(LEVEL_INDEX levelid)
              g_BgRoomInfo[i].cur_room_totalsize = -1;
          }
   
@@ -191,7 +204,7 @@ index 7209f94..38df674 100644
  
  #ifndef TARGET_N64
          {
-@@ -1275,16 +1299,25 @@ void load_bg_file(LEVEL_INDEX levelid)
+@@ -1275,16 +1304,25 @@ void load_bg_file(LEVEL_INDEX levelid)
          {
              D_800443C4[i] = sub_GAME_7F0B993C(i);
          }
@@ -217,7 +230,7 @@ index 7209f94..38df674 100644
   
          for (i = 0; g_BgPortals[i].offset_portal != (NULL); i++)
          {
-@@ -1292,9 +1325,15 @@ void load_bg_file(LEVEL_INDEX levelid)
+@@ -1292,9 +1330,15 @@ void load_bg_file(LEVEL_INDEX levelid)
          }
   
          sub_GAME_7F0B37EC();
@@ -233,7 +246,7 @@ index 7209f94..38df674 100644
      g_RoomLoadBudget = 200;
  }
  
-@@ -2995,7 +3034,7 @@ s32 bgLoadRoomVtxData(s32 roomnum, u8 *dst, s32 len)
+@@ -2995,7 +3039,7 @@ s32 bgLoadRoomVtxData(s32 roomnum, u8 *dst, s32 len)
      obLoadBGFileBytesAtOffset(levelinfotable[levelentry_index].bg_seg_filename, dst + (len - alignedsize), offset, alignedsize);
      result = bgDecompress(dst + (len - alignedsize), dst);
  
