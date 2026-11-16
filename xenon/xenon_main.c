@@ -254,7 +254,7 @@ int main(int argc, char **argv)
         return ok ? 0 : 3;
     }
     fclose(flag);
-    xsdk_log_write("xenon: run.txt encontrado: iniciando o nucleo do jogo (sem video nem audio, %d s)", RUN_SECONDS);
+    xsdk_log_write("xenon: run.txt encontrado: iniciando o nucleo do jogo");
     /* Padroes do 360, gravados so se o midas.ini ainda nao existe (o jogo cria um para PC, a 120 Hz). */
     {
         FILE *ini = fopen("game:/midas.ini", "rb");
