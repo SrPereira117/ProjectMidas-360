@@ -98,6 +98,45 @@ index 986e687..b750011 100644
          nibbleReverse(data + o + 4);
          nibbleReverse(data + o + 6);
          for (p = 0; p < count; p++) {
+diff --git a/src/bondconstants.h b/src/bondconstants.h
+index 5df8e99..bcfd4de 100644
+--- a/src/bondconstants.h
++++ b/src/bondconstants.h
+@@ -4744,7 +4744,7 @@ typedef enum PROJECTILES
+ #define getDistanceSquared(vec)             (vec.x * vec.x) + (vec.y * vec.y) + (vec.z * vec.z)
+ #define isVectorDistanceLessThan(dist, vec) (dist * dist) <= vec
+ 
+-#ifdef TARGET_N64
++#if defined(TARGET_N64) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+ #define _mkshort(a, b)            ((a << 8) | (b & 0xff))
+ #define _mkword(a, b)             ((a << 16) | (b & 0xffff))
+ #else
+diff --git a/src/game/bondview.h b/src/game/bondview.h
+index c7e993f..0613ade 100644
+--- a/src/game/bondview.h
++++ b/src/game/bondview.h
+@@ -2485,7 +2485,7 @@ extern s32 camera_fade_active;
+ /* Intro records' type words are packed with _mkword, which byte-swaps on PC,
+  * but the intro walkers read the type as a whole s32, so unswap it here;
+  * without this no type matches and the walker corrupts the waypoint tables. */
+-#ifdef TARGET_N64
++#if defined(TARGET_N64) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+ #define INTRO_TYPE(rec) ((rec)->type)
+ #else
+ #define INTRO_TYPE(rec) ((s32) (((u32) (rec)->type) >> 24))
+diff --git a/src/game/bondview_r.c b/src/game/bondview_r.c
+index 7ff4a07..67289f4 100644
+--- a/src/game/bondview_r.c
++++ b/src/game/bondview_r.c
+@@ -326,7 +326,7 @@ void bondviewLoadSetupIntroSection(void)
+                         ((struct SetupIntroCamera*)intro_record)->unk10.fval = ((struct SetupIntroCamera*)intro_record)->unk10.ival / M_U16_MAX_VALUE_F;
+                         ((struct SetupIntroCamera*)intro_record)->unk14.fval = ((struct SetupIntroCamera*)intro_record)->unk14.ival / M_U16_MAX_VALUE_F;
+ 
+-#ifdef TARGET_N64
++#if defined(TARGET_N64) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+                         ((struct SetupIntroCamera*)intro_record)->lang1c.lang_ptr = langGet(((struct SetupIntroCamera*)intro_record)->lang1c.lang_index[1]);
+ #else
+                         /* PORT: the text id sits in the low half of the raw word,
 diff --git a/src/game/image.c b/src/game/image.c
 index 08b0e95..73f89a0 100644
 --- a/src/game/image.c
@@ -152,6 +191,50 @@ index 8d98e2a..c1f868c 100644
      for (slot = 0; slot < INLINE_TEX_SWAP_MAX; slot++)
      {
          if (s_InlineTexSwapped[slot] == filedata)
+diff --git a/src/game/prop.c b/src/game/prop.c
+index 9b37bcf..7d8a5ed 100644
+--- a/src/game/prop.c
++++ b/src/game/prop.c
+@@ -1029,7 +1029,7 @@ void setupSingleMonitor(s32 stageID, MonitorObjRecord *monitor, s32 cmdindex)
+ 
+ void setupMultiMonitor(s32 stageID, MultiMonitorObjRecord* monitor, s32 cmdindex)
+ {
+-#ifdef TARGET_N64
++#if defined(TARGET_N64) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+     monitor->Monitor[0] = g_MonitorAnimController;
+     monitorSetImageByNum(&monitor->Monitor[0], monitor->ImageNums[0]);
+ 
+@@ -1509,7 +1509,11 @@ static u32 portMeasureIntro(u32 *rec)
+     {
+         u32 step;
+ 
++#if (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
++        switch (rec[words])
++#else
+         switch (rec[words] >> 24)
++#endif
+         {
+             case INTROTYPE_SPAWN:   step = sizeof(struct SetupIntroSpawn) / 4;   break;
+             case INTROTYPE_ITEM:    step = sizeof(struct SetupIntroItem) / 4;    break;
+@@ -1984,7 +1988,9 @@ void proplvreset2(enum LEVELID stageId)
+          * instead of through _mkword, so swap these known words on each load:
+          *  GUARD word 3 (Preset / chrpreset1 u16s, else hostages flee at spawn),
+          *  OBJECTIVE_START word 2 (halves) and word 3 (full byte reverse),
+-         *  WATCH_MENU_OBJECTIVE_TEXT word 2 (halves). */
++         *  WATCH_MENU_OBJECTIVE_TEXT word 2 (halves).
++         * A big-endian host reads the N64 words as they are: no fixups. */
++#if !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+         {
+             u32 *pd = (u32 *) g_CurrentSetup.propDefs;
+ 
+@@ -2053,6 +2059,7 @@ void proplvreset2(enum LEVELID stageId)
+                 }
+             }
+         }
++#endif /* !big-endian */
+ #endif
+ 
+         // Pad names and bound names are optional. An offset of 0 means absent.
 diff --git a/src/game/stan.h b/src/game/stan.h
 index 9147e26..497cbbf 100644
 --- a/src/game/stan.h
