@@ -82,9 +82,21 @@ typedef int8_t s8;
 
 void portInputPollTick(void);
 void portInputInit(void) { portInputPollTick(); }
+extern void xenon_video_request_stop(void);
+static int g_back_ticks;
+
 void portInputPollTick(void)
 {
     uint32_t mask = 0;
+    {
+        /* BACK segurado por ~2 s (120 leituras) em qualquer controle: sair para o dashboard */
+        INPUT_STATE st;
+        int back = 0;
+        for (int i = 0; i < 4; i++)
+            if (XamInputGetState((uint32_t)i, 0, &st) == 0 && (st.gamepad.buttons & INPUT_GAMEPAD_BACK)) back = 1;
+        g_back_ticks = back ? g_back_ticks + 1 : 0;
+        if (g_back_ticks == 120) xenon_video_request_stop();
+    }
     for (int i = 0; i < 4; i++) {
         poll_pad(i);
         if (g_pad[i].ok) mask |= 1u << i;

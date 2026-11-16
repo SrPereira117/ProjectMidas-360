@@ -192,14 +192,14 @@ static void *midas_thread(void *p)
 
 /* Nesta fase o jogo roda sem video: sem isto ele ficaria rodando para sempre. Passado o tempo, a
  * thread grava no log e encerra o programa, devolvendo o console ao dashboard. */
-#define RUN_SECONDS 60
+static int g_run_seconds;
 
 extern void xenon_video_request_stop(void);
 static void *watchdog(void *arg)
 {
     (void)arg;
-    (void)xsdk_thread_sleep(RUN_SECONDS * 1000);
-    xsdk_log_write("xenon: tempo limite de %d s do teste: encerrando", RUN_SECONDS);
+    (void)xsdk_thread_sleep((uint32_t)g_run_seconds * 1000);
+    xsdk_log_write("xenon: tempo limite de %d s (run.txt): encerrando", g_run_seconds);
     xenon_video_request_stop(); /* o proximo fim de quadro fecha a GPU e sai */
     (void)xsdk_thread_sleep(4000);
     exit(0);
@@ -271,12 +271,26 @@ int main(int argc, char **argv)
     /* O Midas procura a ROM em Data/ ou como baserom.u.z64; aqui dizemos qual e. */
     setenv("GE_ROM", found, 1);
     xsdk_log_write("xenon: captador de falhas: %u", RtlSetVectoredExceptionHandler((void *)fault_handler, (void *)fault_handler));
+    /* run.txt vazio: sem limite de tempo (segure BACK por 2 s para sair). Com um numero dentro (segundos), o jogo
+     * fecha sozinho depois desse tempo: serve para testes sem controle por perto. */
     {
-        pthread_t t;
-        if (pthread_create(&t, NULL, watchdog, NULL) == 0)
-            pthread_detach(t);
-        else
-            xsdk_log_write("xenon: AVISO: nao criei a thread de tempo limite");
+        FILE *rt = fopen("game:/run.txt", "rb");
+        char buf[32] = "";
+        if (rt != NULL) {
+            size_t n = fread(buf, 1, sizeof(buf) - 1, rt);
+            buf[n] = 0;
+            fclose(rt);
+        }
+        g_run_seconds = atoi(buf);
+        if (g_run_seconds > 0) {
+            pthread_t t;
+            if (pthread_create(&t, NULL, watchdog, NULL) == 0)
+                pthread_detach(t);
+            else
+                xsdk_log_write("xenon: AVISO: nao criei a thread de tempo limite");
+        } else {
+            xsdk_log_write("xenon: sem limite de tempo; segure BACK por 2 s para sair");
+        }
     }
     {
         MidasRun run = { argc, argv, 0 };

@@ -27,6 +27,31 @@ index 08b0e95..73f89a0 100644
          dst[totalbytesout + 0] = palette[i] >> 8;
          dst[totalbytesout + 1] = palette[i] & 0xff;
  #else
+diff --git a/src/game/language.c b/src/game/language.c
+index 281ace8..c3ba49d 100644
+--- a/src/game/language.c
++++ b/src/game/language.c
+@@ -1,4 +1,5 @@
+ #include <ultra64.h>
++#include <stdio.h>
+ #include <bondgame.h>
+ #include <memp.h>
+ #include "language.h"
+@@ -432,6 +433,14 @@ u8 * langGet(s32 slotID)
+      * unconditionally. */
+     if (textbank_ptr == NULL)
+     {
++        {
++            static unsigned long long s_seen;
++            if (!(s_seen & (1ull << bank_id)))
++            {
++                s_seen |= 1ull << bank_id;
++                fprintf(stderr, "ge: langGet: text bank %u (slot %u) not loaded\n", (unsigned) bank_id, (unsigned) (slotID & 0x3FF));
++            }
++        }
+         return (u8 *)"Error: Bank not loaded";
+     }
+ #endif
 diff --git a/src/game/objecthandler_2.c b/src/game/objecthandler_2.c
 index 8d98e2a..c1f868c 100644
 --- a/src/game/objecthandler_2.c
