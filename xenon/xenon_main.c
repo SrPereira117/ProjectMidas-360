@@ -7,6 +7,7 @@
  * A main() do Midas (port/src/main.c) foi renomeada para midas_main() na compilacao. */
 #include <dirent.h>
 #include <errno.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +15,7 @@
 #include <sys/stat.h>
 
 #include "xsdk/log.h"
+#include "xsdk/thread.h"
 
 extern int midas_main(int argc, char **argv);
 
@@ -59,7 +61,10 @@ static int scan_dir(const char *dir, char *found, size_t found_size)
         struct stat st;
         if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0)
             continue;
-        snprintf(path, sizeof(path), "%s/%s", dir, e->d_name);
+        {
+            size_t dl = strlen(dir);
+            snprintf(path, sizeof(path), "%s%s%s", dir, (dl && dir[dl - 1] == '/') ? "" : "/", e->d_name);
+        }
         if (stat(path, &st) != 0)
             continue;
         if (seen++ < 30)
@@ -117,6 +122,19 @@ static uint8_t *load_rom(const char *path, const char **format)
     return buf;
 }
 
+/* Nesta fase o jogo roda sem video: sem isto ele ficaria rodando para sempre. Passado o tempo, a
+ * thread grava no log e encerra o programa, devolvendo o console ao dashboard. */
+#define RUN_SECONDS 30
+
+static void *watchdog(void *arg)
+{
+    (void)arg;
+    (void)xsdk_thread_sleep(RUN_SECONDS * 1000);
+    xsdk_log_write("xenon: tempo limite de %d s do teste: encerrando", RUN_SECONDS);
+    exit(0);
+    return NULL;
+}
+
 int main(int argc, char **argv)
 {
     static const char *const dirs[] = { "game:/", "game:/Data" };
@@ -165,6 +183,15 @@ int main(int argc, char **argv)
         return ok ? 0 : 3;
     }
     fclose(flag);
-    xsdk_log_write("xenon: run.txt encontrado: iniciando o nucleo do jogo (sem video nem audio)");
+    xsdk_log_write("xenon: run.txt encontrado: iniciando o nucleo do jogo (sem video nem audio, %d s)", RUN_SECONDS);
+    /* O Midas procura a ROM em Data/ ou como baserom.u.z64; aqui dizemos qual e. */
+    setenv("GE_ROM", found, 1);
+    {
+        pthread_t t;
+        if (pthread_create(&t, NULL, watchdog, NULL) == 0)
+            pthread_detach(t);
+        else
+            xsdk_log_write("xenon: AVISO: nao criei a thread de tempo limite");
+    }
     return midas_main(argc, argv);
 }
