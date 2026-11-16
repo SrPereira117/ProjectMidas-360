@@ -44,6 +44,22 @@ jobs:
       - name: Verificar a compilacao
         run: bash tools/compile_check.sh midas "$PREFIX/bin/powerpc-xsdk-elf-gcc" report
 
+      - name: Compilar a biblioteca do xsdk (libxsdk.a)
+        run: make -C xsdk -j"$(nproc)" TOOLCHAIN="$PREFIX/bin/powerpc-xsdk-elf-" build/libxsdk.a
+
+      - name: Marco 2 - compilar de verdade e ligar o nucleo
+        run: bash tools/build_core.sh midas xsdk "$PREFIX/bin/powerpc-xsdk-elf-" core
+
+      - name: Imprimir o resultado do marco 2
+        if: always()
+        run: |
+          echo "##### M2 RESUMO"; cat core/summary.txt
+          echo "##### M2 ARQUIVOS QUE FALHARAM"; grep '^FAIL' core/compile.txt || true
+          echo "##### M2 ERROS DE COMPILACAO"; head -c 30000 core/compile_errors.txt
+          echo "##### M2 SIMBOLOS NAO RESOLVIDOS (contagem)"
+          grep -o "undefined reference to .*" core/link.txt | sed "s/undefined reference to //" | sort | uniq -c | sort -rn | head -150
+          echo "##### M2 FIM"
+
       - name: Imprimir o relatorio no log
         if: always()
         run: |
