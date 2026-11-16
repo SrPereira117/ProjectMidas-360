@@ -1,0 +1,49 @@
+diff --git a/port/src/audio_stubs.c b/port/src/audio_stubs.c
+index a871627..fe12990 100644
+--- a/port/src/audio_stubs.c
++++ b/port/src/audio_stubs.c
+@@ -63,13 +63,22 @@
+  * coincide, so both views work off this patch).
+  */
+ 
++/* xenon: em host big-endian os dados da ROM ja estao na ordem certa */
++#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++#define PORT_HOST_BE 1
++#else
++#define PORT_HOST_BE 0
++#endif
++
+ static u16 portBSwap16(u16 v)
+ {
++    if (PORT_HOST_BE) return v;
+     return (u16)((v >> 8) | (v << 8));
+ }
+ 
+ static u32 portBSwap32(u32 v)
+ {
++    if (PORT_HOST_BE) return v;
+     return (v >> 24) | ((v >> 8) & 0xFF00u) | ((v & 0xFF00u) << 8) | (v << 24);
+ }
+ 
+diff --git a/src/music.c b/src/music.c
+index 3b4ae17..04cb60d 100644
+--- a/src/music.c
++++ b/src/music.c
+@@ -799,7 +799,7 @@ void musicSeqPlayerInit(void)
+     g_musicDataTable = alHeapAlloc(&g_musicHeap, 1, size);
+     romCopy(g_musicDataTable, (void *)tblSegmentRomStartAddress, size);
+ 
+-#ifndef TARGET_N64
++#if !defined(TARGET_N64) && !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__) /* xenon: host ja e big-endian */
+     /* The segment is the real big-endian music.sbk, so every multibyte header
+      * field read here (and by musicSeqFileNew's rebase) must be byte-swapped
+      * first. Swap the probe copy's seqCount now, then the whole header after
+@@ -812,7 +812,7 @@ void musicSeqPlayerInit(void)
+     g_musicDataTable = alHeapAlloc(&g_musicHeap, 1, tblSegmentSize);
+     romCopy(g_musicDataTable, (void *)tblSegmentRomStartAddress, ALIGN16_a(tblSegmentSize));
+ 
+-#ifndef TARGET_N64
++#if !defined(TARGET_N64) && !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__) /* xenon: host ja e big-endian */
+     g_musicDataTable->seqCount =
+         (u16)((g_musicDataTable->seqCount >> 8) | (g_musicDataTable->seqCount << 8));
+     for (ui = 0; ui < g_musicDataTable->seqCount; ui++)
