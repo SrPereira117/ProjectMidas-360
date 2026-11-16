@@ -131,13 +131,31 @@ set_source_files_properties(${KEEP_OBJS} PROPERTIES EXTERNAL_OBJECT TRUE GENERAT
 # --- O desenhista (Fast3D em C++) numa biblioteca propria -------------------------------
 # Sem a pasta src/ nos includes: o src/sched.h do jogo esconderia o <sched.h> do sistema.
 set(CMAKE_CXX_STANDARD 20)
+# glslang (GLSL -> SPIR-V) para compilar no proprio 360 os shaders que o Midas gera; so o front-end GLSL, sem o
+# otimizador (o mesmo ajuste do backend gfx_xsdk do libultraship-xenon). O xost (SPIR-V -> Xenos) esta no libxsdk.
+set(GLSLANG_XENON_DIR "" CACHE PATH "Repositorio glslang-xenon (com update_glslang_sources.py ja executado)")
+if(NOT EXISTS "${GLSLANG_XENON_DIR}/glslang/Public/ShaderLang.h")
+    message(FATAL_ERROR "GLSLANG_XENON_DIR nao e o repositorio glslang-xenon: '${GLSLANG_XENON_DIR}'")
+endif()
+set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
+set(ENABLE_HLSL OFF CACHE BOOL "" FORCE)
+set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
+set(GLSLANG_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXTERNAL OFF CACHE BOOL "" FORCE)
+set(GLSLANG_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory("${GLSLANG_XENON_DIR}" glslang EXCLUDE_FROM_ALL)
+
 add_library(midas_gfx STATIC ${MIDAS_DIR}/port/fast3d/gfx_pc.cpp ${MIDAS_DIR}/port/fast3d/gfx_cc.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/xenon_video.cpp)
+            ${CMAKE_CURRENT_SOURCE_DIR}/xenon_video.cpp ${CMAKE_CURRENT_SOURCE_DIR}/xenon_glsl.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/xenon_shader.cpp)
+target_link_libraries(midas_gfx PUBLIC glslang SPIRV glslang-default-resource-limits)
+set_property(TARGET midas_gfx PROPERTY CXX_STANDARD 20)
 target_compile_definitions(midas_gfx PRIVATE ${MIDAS_DEFS})
 target_compile_options(midas_gfx PRIVATE -fno-strict-aliasing -fwrapv -funsigned-char -ffp-contract=off -O2 -w)
 target_include_directories(midas_gfx PRIVATE ${MIDAS_DIR} ${MIDAS_DIR}/include ${MIDAS_DIR}/include/ultra64
     ${MIDAS_DIR}/include/PR ${MIDAS_DIR}/port/include ${MIDAS_DIR}/port/fast3d
-    ${CMAKE_CURRENT_SOURCE_DIR}/compat ${CMAKE_BINARY_DIR}/generated ${MIDAS_DIR}/src/game)
+    ${CMAKE_CURRENT_SOURCE_DIR}/compat ${CMAKE_BINARY_DIR}/generated ${MIDAS_DIR}/src/game
+    ${CMAKE_CURRENT_SOURCE_DIR})
 
 # --- O programa ---------------------------------------------------------------------
 add_executable(midas_xenon ${GAME_SRC} ${ENGINE_SRC} ${GU_SRC} ${PORT_SRC}

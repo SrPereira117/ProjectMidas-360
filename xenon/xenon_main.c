@@ -192,13 +192,16 @@ static void *midas_thread(void *p)
 
 /* Nesta fase o jogo roda sem video: sem isto ele ficaria rodando para sempre. Passado o tempo, a
  * thread grava no log e encerra o programa, devolvendo o console ao dashboard. */
-#define RUN_SECONDS 30
+#define RUN_SECONDS 60
 
+extern void xenon_video_request_stop(void);
 static void *watchdog(void *arg)
 {
     (void)arg;
     (void)xsdk_thread_sleep(RUN_SECONDS * 1000);
     xsdk_log_write("xenon: tempo limite de %d s do teste: encerrando", RUN_SECONDS);
+    xenon_video_request_stop(); /* o proximo fim de quadro fecha a GPU e sai */
+    (void)xsdk_thread_sleep(4000);
     exit(0);
     return NULL;
 }

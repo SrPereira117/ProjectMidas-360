@@ -46,6 +46,11 @@ jobs:
       - name: Baixar o Project Midas (versao fixa 1.0.2b)
         run: git clone --depth 1 --branch 1.0.2b https://github.com/murkantor/Project-Midas midas
 
+      - name: Baixar o glslang-xenon (compila os shaders no 360)
+        run: |
+          git clone --depth 1 --branch xenon https://github.com/xenosworks/glslang-xenon.git glslang-xenon
+          cd glslang-xenon && python3 update_glslang_sources.py
+
       - name: Aplicar os patches do 360
         run: |
           for p in xenon/patches/*.patch; do
@@ -56,7 +61,7 @@ jobs:
         run: |
           cmake -S xenon -B build-midas -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="$PWD/xsdk/cmake/xsdk.cmake" -DXSDK_TOOLCHAIN="$PREFIX" \
-            -DMIDAS_DIR="$PWD/midas" -DCMAKE_BUILD_TYPE=Release 2>&1 | tail -25
+            -DMIDAS_DIR="$PWD/midas" -DGLSLANG_XENON_DIR="$PWD/glslang-xenon" -DCMAKE_BUILD_TYPE=Release 2>&1 | tail -25
 
       - name: Compilar e ligar
         id: build
