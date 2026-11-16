@@ -8,9 +8,8 @@
 
 typedef int32_t s32;
 
-/* --- audio_pc.c do Midas (SDL): sem som por enquanto ------------------------------- */
-void portAudioPump(void) {}
-void portAudioPumpForce(void) {}
+/* --- som: audio_pc.c do Midas + xenon_audio.c ------------------------------------------- */
+int portInputWindowFocused(void) { return 1; }
 
 /* --- POSIX que o 360 nao tem --------------------------------------------------- */
 /* Dorme ate um instante (ou por um intervalo). A precisao e de 1 ms, a do xsdk_thread_sleep. */

@@ -152,6 +152,38 @@ static inline int SDL_ShowSimpleMessageBox(uint32_t f, const char *t, const char
     printf("ge: erro: %s: %s\n", t ? t : "", m ? m : "");
     return 0;
 }
+/* --- audio: o Midas (audio_pc.c) enche uma fila de s16 estereo a 22050 Hz; xenon_audio.c a esvazia para o xsdk_audio --- */
+typedef uint32_t SDL_AudioDeviceID;
+typedef uint16_t SDL_AudioFormat;
+#define AUDIO_S16SYS 0x9010
+typedef struct {
+    int freq;
+    SDL_AudioFormat format;
+    uint8_t channels, silence;
+    uint16_t samples;
+    uint32_t size;
+    void *callback;
+    void *userdata;
+} SDL_AudioSpec;
+typedef struct SDL_RWops SDL_RWops;
+SDL_AudioDeviceID SDL_OpenAudioDevice(const char *name, int capture, const SDL_AudioSpec *want, SDL_AudioSpec *have, int changes);
+void SDL_CloseAudioDevice(SDL_AudioDeviceID dev);
+int SDL_QueueAudio(SDL_AudioDeviceID dev, const void *data, uint32_t len);
+uint32_t SDL_GetQueuedAudioSize(SDL_AudioDeviceID dev);
+static inline void SDL_PauseAudioDevice(SDL_AudioDeviceID dev, int pause) { (void) dev; (void) pause; }
+static inline int SDL_InitSubSystem(uint32_t f) { (void) f; return 0; }
+static inline void SDL_QuitSubSystem(uint32_t f) { (void) f; }
+static inline const char *SDL_GetCurrentAudioDriver(void) { return "xenon"; }
+static inline int SDL_GetNumAudioDrivers(void) { return 1; }
+static inline const char *SDL_GetAudioDriver(int i) { (void) i; return "xenon"; }
+static inline int SDL_AudioInit(const char *n) { (void) n; return 0; }
+static inline void SDL_AudioQuit(void) {}
+static inline int SDL_GetNumAudioDevices(int capture) { (void) capture; return 1; }
+static inline const char *SDL_GetAudioDeviceName(int i, int capture) { (void) i; (void) capture; return "Xbox 360"; }
+static inline SDL_RWops *SDL_RWFromFile(const char *f, const char *m) { (void) f; (void) m; return (SDL_RWops *) 0; }
+static inline int SDL_RWclose(SDL_RWops *r) { (void) r; return 0; }
+static inline int SDL_setenv(const char *n, const char *v, int o) { (void) n; (void) v; (void) o; return 0; }
+
 #define SDL_INIT_VIDEO 0x20
 #define SDL_INIT_GAMECONTROLLER 0x2000
 #define SDL_INIT_AUDIO 0x10

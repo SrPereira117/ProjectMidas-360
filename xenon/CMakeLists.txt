@@ -67,7 +67,7 @@ endforeach()
 file(GLOB PORT_SRC CONFIGURE_DEPENDS ${MIDAS_DIR}/port/src/*.c)
 # Sem SDL por enquanto: video, audio e controle entram em outra etapa.
 list(REMOVE_ITEM PORT_SRC
-    ${MIDAS_DIR}/port/src/audio_pc.c ${MIDAS_DIR}/port/src/headless_stubs.c
+    ${MIDAS_DIR}/port/src/headless_stubs.c
     ${MIDAS_DIR}/port/src/input_pc.c ${MIDAS_DIR}/port/src/raphnet.c)
 
 set(LOOSE_SRC ${MIDAS_DIR}/assets/oddtextures.c ${MIDAS_DIR}/assets/rarewarelogo.c
@@ -160,7 +160,7 @@ target_include_directories(midas_gfx PRIVATE ${MIDAS_DIR} ${MIDAS_DIR}/include $
 # --- O programa ---------------------------------------------------------------------
 add_executable(midas_xenon ${GAME_SRC} ${ENGINE_SRC} ${GU_SRC} ${PORT_SRC}
                ${MIDAS_DIR}/src/libultrare/io/vitbl.c ${LOOSE_SRC} ${KEEP_OBJS}
-               ${CMAKE_CURRENT_SOURCE_DIR}/xenon_stubs.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_input.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_main.c)
+               ${CMAKE_CURRENT_SOURCE_DIR}/xenon_stubs.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_audio.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_input.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_main.c)
 target_compile_definitions(midas_xenon PRIVATE ${MIDAS_DEFS})
 target_compile_options(midas_xenon PRIVATE ${MIDAS_CFLAGS})
 target_include_directories(midas_xenon PRIVATE ${MIDAS_INCS}
