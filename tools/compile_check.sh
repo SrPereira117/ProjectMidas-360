@@ -18,7 +18,9 @@ DEFS=(-DVERSION_US -DLANG_US -DREFRESH_NTSC -DLEFTOVERDEBUG -DLEFTOVERSPECTRUM
 INCS=(-I. -Iinclude -Iinclude/ultra64 -Iinclude/PR -Isrc -Isrc/game -Isrc/inflate
       -Iport/include -Isrc/libultra)
 FLAGS=(-std=gnu11 -ffreestanding -fms-extensions -fno-strict-aliasing -fwrapv
-       -funsigned-char -fcommon -w -fsyntax-only)
+       -funsigned-char -fcommon -w -fsyntax-only
+       -Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types
+       -Wno-error=int-conversion -Wno-error=implicit-int -Wno-error=return-mismatch)
 
 # Mesma lista do CMakeLists do Midas: jogo, motor (menos o que o port apaga) e libultra.
 EXCLUDE=" boot tlb_manage tlb_hardwire rmon usb debug crash motor "
