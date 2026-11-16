@@ -1,0 +1,65 @@
+name: build-xsdk-samples
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      PREFIX: ${{ github.workspace }}/xsdk-gcc
+    steps:
+      - name: Dependencias
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bison flex texinfo libgmp-dev libmpfr-dev \
+            libmpc-dev curl xz-utils patch python3 cmake ninja-build git
+
+      - name: Baixar o xsdk
+        uses: actions/checkout@v4
+        with:
+          repository: xenosworks/xsdk
+          path: xsdk
+
+      - name: Cache do toolchain
+        id: tc
+        uses: actions/cache@v4
+        with:
+          path: xsdk-gcc
+          key: xsdk-toolchain-${{ hashFiles('xsdk/tools/toolchain/**') }}
+
+      - name: Compilar o toolchain (GCC 15 para o 360)
+        if: steps.tc.outputs.cache-hit != 'true'
+        working-directory: xsdk
+        run: |
+          PREFIX=$PREFIX WORK=$RUNNER_TEMP/xsdk-gcc-work JOBS=$(nproc) tools/toolchain/build.sh
+          $PREFIX/bin/powerpc-xsdk-elf-gcc --version
+
+      - name: Compilar o glslang-xenon
+        if: steps.tc.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch xenon https://github.com/xenosworks/glslang-xenon.git glslang-xenon
+          cd glslang-xenon && python3 update_glslang_sources.py
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_OPT=ON \
+            -DSPIRV_SKIP_EXECUTABLES=ON -DGLSLANG_TESTS=OFF
+          cmake --build build
+          cp build/StandAlone/glslang $PREFIX/bin/
+
+      - name: Compilar o xsdk e os exemplos
+        working-directory: xsdk
+        run: |
+          make -j$(nproc) TOOLCHAIN=$PREFIX/bin/powerpc-xsdk-elf-
+          make samples TOOLCHAIN=$PREFIX/bin/powerpc-xsdk-elf-
+          ls -l build/samples/*/*.xex build/xsdk_test.xex
+
+      - name: Guardar os .xex
+        uses: actions/upload-artifact@v4
+        with:
+          name: xsdk-xex
+          path: |
+            xsdk/build/samples/hello/hello.xex
+            xsdk/build/samples/triangle/triangle.xex
+            xsdk/build/samples/cube/cube.xex
+            xsdk/build/xsdk_test.xex
