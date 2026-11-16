@@ -55,3 +55,7 @@ void portInputCapturePadAndExit(const char *arg) { (void)arg; }
 void portInputCalibratePadAndExit(const char *arg) { (void)arg; }
 void portInputRumbleTestAndExit(const char *arg) { (void)arg; }
 f32 portInputMouseAimScale(void) { return 1.0f; }
+s32 portInputDeviceModeRaw(s32 dev) { (void)dev; return 0; }          /* 0: automatico */
+const char *portInputLayoutShown(s32 dev) { (void)dev; return ""; }
+s32 portInputLayoutInUse(s32 dev) { (void)dev; return 0; }
+s32 portInputPadResetDefaults(s32 dev) { (void)dev; return 0; }
