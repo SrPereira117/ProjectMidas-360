@@ -1,3 +1,26 @@
+diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
+index 8900755..e4e2ffd 100644
+--- a/port/fast3d/gfx_pc.cpp
++++ b/port/fast3d/gfx_pc.cpp
+@@ -7629,6 +7629,18 @@ static void gfx_run_dl(Gfx* cmd) {
+                     }
+                     fflush(stderr);
+                 }
++                {
++                    /* xenon bring-up: raw words at the start of the list and around the bad command */
++                    const uint32_t *q = (const uint32_t *) dListStart;
++                    const uint32_t *r = (const uint32_t *) cmd;
++                    int k;
++                    fprintf(stderr, "gfx: dlStart words:");
++                    for (k = 0; k < 16; k++) fprintf(stderr, " %08x", q[k]);
++                    fprintf(stderr, "\ngfx: around cmd (-8..+8 words):");
++                    for (k = -8; k < 8; k++) fprintf(stderr, " %08x", r[k]);
++                    fprintf(stderr, "\n");
++                    fflush(stderr);
++                }
+                 sysFatalError("Unknown GBI opcode 0x%02x at %p.\nw0 %08x\nw1 %08x", opcode, cmd, cmd->words.w0, cmd->words.w1);
+                 break;
+         }
 diff --git a/port/src/romdata.c b/port/src/romdata.c
 index 5af83d8..22e19ce 100644
 --- a/port/src/romdata.c
