@@ -17,6 +17,10 @@
 #include "xsdk/log.h"
 #include "xsdk/thread.h"
 
+/* Depois de pthread.h/xsdk/thread.h a macro errno some neste toolchain; __errno() e o que ela expande. */
+extern int *__errno(void);
+#define XERRNO (*__errno())
+
 extern int midas_main(int argc, char **argv);
 
 #define ROM_SIZE   0xC00000u    /* 12.582.912 bytes: a cartucho (U) original */
@@ -52,7 +56,7 @@ static int scan_dir(const char *dir, char *found, size_t found_size)
     int seen = 0, hit = 0;
 
     if (!d) {
-        xsdk_log_write("xenon: pasta %s: nao abre (errno %d)", dir, errno);
+        xsdk_log_write("xenon: pasta %s: nao abre (errno %d)", dir, XERRNO);
         return 0;
     }
     xsdk_log_write("xenon: pasta %s:", dir);
@@ -91,7 +95,7 @@ static uint8_t *load_rom(const char *path, const char **format)
     }
     f = fopen(path, "rb");
     if (!f) {
-        xsdk_log_write("xenon: nao consegui abrir %s (errno %d)", path, errno);
+        xsdk_log_write("xenon: nao consegui abrir %s (errno %d)", path, XERRNO);
         free(buf);
         return NULL;
     }
