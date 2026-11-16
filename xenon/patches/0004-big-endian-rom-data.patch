@@ -271,6 +271,19 @@ index 9b37bcf..7d8a5ed 100644
  #endif
  
          // Pad names and bound names are optional. An offset of 0 means absent.
+diff --git a/src/game/stan.c b/src/game/stan.c
+index df375ec..4c40b2c 100644
+--- a/src/game/stan.c
++++ b/src/game/stan.c
+@@ -2812,7 +2812,7 @@ void stanGetTileOrderedPointWorldPos(StandTile *tile, s32 pointnum, coord3d *out
+     StandTilePoint *point;
+     f32 scale;
+ 
+-#ifdef TARGET_N64
++#if defined(TARGET_N64) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+     pointnum = tile->tail.half >> (8 - (pointnum * 4));
+ #else
+     /* the mask lands at the array index below - only the shift flips */
 diff --git a/src/game/stan.h b/src/game/stan.h
 index 9147e26..497cbbf 100644
 --- a/src/game/stan.h
