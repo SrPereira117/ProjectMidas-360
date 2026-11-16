@@ -8,20 +8,15 @@
 
 typedef int32_t s32;
 
-/* --- video.c do Midas (SDL) --------------------------------------------------- */
-void portVideoKbdDigitalMove(s32 *dx, s32 *dy) { if (dx) *dx = 0; if (dy) *dy = 0; }
-void portVideoBindsResetDefaults(void) {}
-s32 portPlayerCrosshairOwn(s32 player) { (void)player; return -2; }   /* -2: sem cor propria */
-s32 portPlayerCrosshairColor(s32 player) { (void)player; return -1; } /* -1: vermelho */
-void portPlayerCrosshairSet(s32 player, s32 rgb) { (void)player; (void)rgb; }
-s32 portHudWideCfg(void) { return -1; }                               /* -1: sem configuracao */
-void portHudWideAdopt(s32 wide) { (void)wide; }
-
 /* --- input_pc.c do Midas (SDL) ------------------------------------------------ */
 s32 portInputDeviceModeRaw(s32 dev) { (void)dev; return 0; }          /* 0: automatico */
 const char *portInputLayoutShown(s32 dev) { (void)dev; return ""; }
 s32 portInputLayoutInUse(s32 dev) { (void)dev; return 0; }
 s32 portInputPadResetDefaults(s32 dev) { (void)dev; return 0; }
+
+/* --- audio_pc.c do Midas (SDL): sem som por enquanto ------------------------------- */
+void portAudioPump(void) {}
+void portAudioPumpForce(void) {}
 
 /* --- POSIX que o 360 nao tem --------------------------------------------------- */
 /* Dorme ate um instante (ou por um intervalo). A precisao e de 1 ms, a do xsdk_thread_sleep. */

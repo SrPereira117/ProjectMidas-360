@@ -7,7 +7,7 @@
 # de plataforma do 360 nao existe. Sem GE_ROMDATA_FALLBACK: o executavel nao carrega
 # os dados grandes do jogo; eles vem da ROM do usuario.
 cmake_minimum_required(VERSION 3.25)
-project(midas_xenon C)
+project(midas_xenon C CXX)
 
 set(MIDAS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../midas" CACHE PATH "Pasta do Project Midas")
 get_filename_component(MIDAS_DIR "${MIDAS_DIR}" ABSOLUTE)
@@ -19,7 +19,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_EXTENSIONS ON)
 
 set(MIDAS_DEFS VERSION_US LANG_US REFRESH_NTSC LEFTOVERDEBUG LEFTOVERSPECTRUM BUGFIX_R0
-               NONMATCHING AVOID_UB _LANGUAGE_C)
+               NONMATCHING AVOID_UB _LANGUAGE_C GE_VIDEO=1)
 # Flags do Midas, menos o que e x86 (-m32, -msse2, frame pointer do crash handler).
 # -ffp-contract=off: sem fused multiply-add, para os floats arredondarem como no N64.
 set(MIDAS_CFLAGS -ffreestanding -fms-extensions -fno-strict-aliasing -fwrapv -funsigned-char
@@ -67,7 +67,7 @@ endforeach()
 file(GLOB PORT_SRC CONFIGURE_DEPENDS ${MIDAS_DIR}/port/src/*.c)
 # Sem SDL por enquanto: video, audio e controle entram em outra etapa.
 list(REMOVE_ITEM PORT_SRC
-    ${MIDAS_DIR}/port/src/audio_pc.c ${MIDAS_DIR}/port/src/video.c
+    ${MIDAS_DIR}/port/src/audio_pc.c ${MIDAS_DIR}/port/src/headless_stubs.c
     ${MIDAS_DIR}/port/src/input_pc.c ${MIDAS_DIR}/port/src/raphnet.c)
 
 set(LOOSE_SRC ${MIDAS_DIR}/assets/oddtextures.c ${MIDAS_DIR}/assets/rarewarelogo.c
@@ -128,6 +128,17 @@ include(${MIDAS_DIR}/port/generated/asset_manifest.cmake)
 get_property(KEEP_OBJS GLOBAL PROPERTY KEEP_OBJS_PROP)
 set_source_files_properties(${KEEP_OBJS} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 
+# --- O desenhista (Fast3D em C++) numa biblioteca propria -------------------------------
+# Sem a pasta src/ nos includes: o src/sched.h do jogo esconderia o <sched.h> do sistema.
+set(CMAKE_CXX_STANDARD 20)
+add_library(midas_gfx STATIC ${MIDAS_DIR}/port/fast3d/gfx_pc.cpp ${MIDAS_DIR}/port/fast3d/gfx_cc.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/xenon_video.cpp)
+target_compile_definitions(midas_gfx PRIVATE ${MIDAS_DEFS})
+target_compile_options(midas_gfx PRIVATE -fno-strict-aliasing -fwrapv -funsigned-char -ffp-contract=off -O2 -w)
+target_include_directories(midas_gfx PRIVATE ${MIDAS_DIR} ${MIDAS_DIR}/include ${MIDAS_DIR}/include/ultra64
+    ${MIDAS_DIR}/include/PR ${MIDAS_DIR}/port/include ${MIDAS_DIR}/port/fast3d
+    ${CMAKE_CURRENT_SOURCE_DIR}/compat ${CMAKE_BINARY_DIR}/generated ${MIDAS_DIR}/src/game)
+
 # --- O programa ---------------------------------------------------------------------
 add_executable(midas_xenon ${GAME_SRC} ${ENGINE_SRC} ${GU_SRC} ${PORT_SRC}
                ${MIDAS_DIR}/src/libultrare/io/vitbl.c ${LOOSE_SRC} ${KEEP_OBJS}
@@ -141,5 +152,5 @@ target_include_directories(midas_xenon PRIVATE ${MIDAS_INCS}
 set_source_files_properties(${MIDAS_DIR}/src/str.c PROPERTIES COMPILE_DEFINITIONS "strtol=midas_strtol")
 # A main() do Midas vira midas_main(); a nossa (xenon_main.c) acha a ROM e chama a dele.
 set_source_files_properties(${MIDAS_DIR}/port/src/main.c PROPERTIES COMPILE_DEFINITIONS "main=midas_main")
-target_link_libraries(midas_xenon m)
+target_link_libraries(midas_xenon midas_gfx midas_gfx m)
 xsdk_add_xex(midas_xenon TITLE_ID 0x47454D44 NAME "GoldenEye Midas" VERSION 0.0.1.0)
