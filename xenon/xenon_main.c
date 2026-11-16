@@ -126,6 +126,23 @@ static uint8_t *load_rom(const char *path, const char **format)
     return buf;
 }
 
+/* O Midas pede 16 MB de pilha no Windows (percursos recursivos de salas/portais estouram 1 MB).
+ * A thread principal do 360 so tem 1 MB, entao o nucleo roda numa thread propria. */
+#define MIDAS_STACK_BYTES (16u * 1024u * 1024u)
+
+typedef struct {
+    int argc;
+    char **argv;
+    int ret;
+} MidasRun;
+
+static void *midas_thread(void *p)
+{
+    MidasRun *r = p;
+    r->ret = midas_main(r->argc, r->argv);
+    return NULL;
+}
+
 /* Nesta fase o jogo roda sem video: sem isto ele ficaria rodando para sempre. Passado o tempo, a
  * thread grava no log e encerra o programa, devolvendo o console ao dashboard. */
 #define RUN_SECONDS 30
@@ -197,5 +214,20 @@ int main(int argc, char **argv)
         else
             xsdk_log_write("xenon: AVISO: nao criei a thread de tempo limite");
     }
-    return midas_main(argc, argv);
+    {
+        MidasRun run = { argc, argv, 0 };
+        pthread_attr_t attr;
+        pthread_t t;
+
+        pthread_attr_init(&attr);
+        pthread_attr_setstacksize(&attr, MIDAS_STACK_BYTES);
+        if (pthread_create(&t, &attr, midas_thread, &run) != 0) {
+            xsdk_log_write("xenon: AVISO: sem thread de 16 MB, rodando na principal (1 MB)");
+            return midas_main(argc, argv);
+        }
+        xsdk_log_write("xenon: nucleo em thread propria, pilha de %u MB", MIDAS_STACK_BYTES >> 20);
+        pthread_join(t, NULL);
+        xsdk_log_write("xenon: nucleo terminou, codigo %d", run.ret);
+        return run.ret;
+    }
 }
