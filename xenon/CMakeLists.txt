@@ -131,7 +131,7 @@ set_source_files_properties(${KEEP_OBJS} PROPERTIES EXTERNAL_OBJECT TRUE GENERAT
 # --- O programa ---------------------------------------------------------------------
 add_executable(midas_xenon ${GAME_SRC} ${ENGINE_SRC} ${GU_SRC} ${PORT_SRC}
                ${MIDAS_DIR}/src/libultrare/io/vitbl.c ${LOOSE_SRC} ${KEEP_OBJS}
-               ${CMAKE_CURRENT_SOURCE_DIR}/xenon_stubs.c)
+               ${CMAKE_CURRENT_SOURCE_DIR}/xenon_stubs.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_main.c)
 target_compile_definitions(midas_xenon PRIVATE ${MIDAS_DEFS})
 target_compile_options(midas_xenon PRIVATE ${MIDAS_CFLAGS})
 target_include_directories(midas_xenon PRIVATE ${MIDAS_INCS}
@@ -139,5 +139,7 @@ target_include_directories(midas_xenon PRIVATE ${MIDAS_INCS}
 # A strtol do jogo (src/str.c) colide com a da newlib; as chamadas passam a usar a da newlib,
 # que se comporta igual para esses usos (argumentos de linha de comando e stan.c).
 set_source_files_properties(${MIDAS_DIR}/src/str.c PROPERTIES COMPILE_DEFINITIONS "strtol=midas_strtol")
+# A main() do Midas vira midas_main(); a nossa (xenon_main.c) acha a ROM e chama a dele.
+set_source_files_properties(${MIDAS_DIR}/port/src/main.c PROPERTIES COMPILE_DEFINITIONS "main=midas_main")
 target_link_libraries(midas_xenon m)
 xsdk_add_xex(midas_xenon TITLE_ID 0x47454D44 NAME "GoldenEye Midas" VERSION 0.0.1.0)

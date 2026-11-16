@@ -16,8 +16,10 @@ Port do **GoldenEye 007** (N64) para o Xbox 360, feito a partir do
 ## Legal
 
 - **Este repositório não contém ROM nem arquivos do jogo.** Cada pessoa usa a própria cópia legal.
-- O build usa o modo do Midas em que o executável **não carrega os dados da Rare** (`GE_ROMDATA_FALLBACK=OFF`):
-  tudo vem da ROM do usuário, que o jogo confere antes de iniciar.
+- Os dados do jogo (fases, modelos, sons, texturas) **vêm da ROM do usuário**, que o programa confere pelo tamanho
+  e pelo CRC antes de usar. O build usa o modo do Midas sem cópia embutida desses dados
+  (`GE_ROMDATA_FALLBACK=OFF`). Poucos trechos pequenos (algumas texturas e um logo) ainda ficam no executável,
+  como no Midas original.
 - Não publique `.xex` compilados junto com dados do jogo, nem ROMs.
 - O código novo daqui é MIT. O Midas, o xsdk e a decompilação mantêm as licenças deles
   (a decompilação do GoldenEye não tem licença; o jogo pertence aos detentores dos direitos).

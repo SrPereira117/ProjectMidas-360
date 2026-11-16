@@ -72,3 +72,11 @@ jobs:
           grep -oE "undefined reference to \`[^']+'" build.log | sort | uniq -c | sort -rn | head -80 || true
           echo "##### XEX"; ls -l build-midas/*.xex 2>&1 || true
           if [ "${{ steps.build.outcome }}" = "failure" ]; then echo "BUILD FALHOU (esperado nesta fase)"; fi
+
+      - name: Guardar o .xex
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: midas-xenon-xex
+          path: build-midas/midas_xenon.xex
+          if-no-files-found: warn
