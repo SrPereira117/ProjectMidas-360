@@ -1,0 +1,68 @@
+name: midas-360-build
+
+# Compila e liga o Midas (sem video/audio ainda) para o 360 e mostra os erros no log.
+on:
+  workflow_dispatch:
+  push:
+    branches: [midas-360]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PREFIX: ${{ github.workspace }}/xsdk-gcc
+    steps:
+      - name: Este repositorio
+        uses: actions/checkout@v4
+
+      - name: Baixar o xsdk
+        uses: actions/checkout@v4
+        with:
+          repository: xenosworks/xsdk
+          path: xsdk
+
+      - name: Toolchain do xsdk (cache)
+        uses: actions/cache/restore@v4
+        with:
+          path: xsdk-gcc
+          key: xsdk-toolchain-${{ hashFiles('xsdk/tools/toolchain/**') }}
+          restore-keys: xsdk-toolchain-
+
+      - name: Conferir o compilador
+        run: |
+          if [ ! -x "$PREFIX/bin/powerpc-xsdk-elf-gcc" ]; then
+            echo "::error::Toolchain fora do cache. Rode build-xsdk-samples na main."; exit 1
+          fi
+          sudo apt-get update -qq && sudo apt-get install -y -qq cmake ninja-build python3
+
+      - name: Compilar a biblioteca do xsdk
+        working-directory: xsdk
+        run: make -j"$(nproc)" TOOLCHAIN="$PREFIX/bin/powerpc-xsdk-elf-" build/libxsdk.a
+
+      - name: Baixar o Project Midas (versao fixa 1.0.2b)
+        run: git clone --depth 1 --branch 1.0.2b https://github.com/murkantor/Project-Midas midas
+
+      - name: Configurar
+        run: |
+          cmake -S xenon -B build-midas -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$PWD/xsdk/cmake/xsdk.cmake" -DXSDK_TOOLCHAIN="$PREFIX" \
+            -DMIDAS_DIR="$PWD/midas" -DCMAKE_BUILD_TYPE=Release 2>&1 | tail -25
+
+      - name: Compilar e ligar
+        id: build
+        continue-on-error: true
+        run: cmake --build build-midas -- -k 0 2>&1 | tee build.log | tail -5
+
+      - name: Resumo dos erros
+        run: |
+          echo "##### ARQUIVOS COM ERRO DE COMPILACAO"
+          grep -E "^FAILED:" build.log | sed 's/^FAILED: //' | head -40 || true
+          echo "##### ERROS (mais comuns)"
+          grep -E "error:|fatal error:" build.log | sed -E 's/^[^ ]+: //' | sed -E "s/'[^']*'/'X'/g" | sort | uniq -c | sort -rn | head -25 || true
+          echo "##### PRIMEIROS ERROS, COM O ARQUIVO"
+          grep -E "error:|fatal error:" build.log | head -40 | cut -c1-240 || true
+          echo "##### SIMBOLOS INDEFINIDOS NA LIGACAO"
+          grep -oE "undefined reference to \`[^']+'" build.log | sort | uniq -c | sort -rn | head -80 || true
+          echo "##### XEX"; ls -l build-midas/*.xex 2>&1 || true
+          if [ "${{ steps.build.outcome }}" = "failure" ]; then echo "BUILD FALHOU (esperado nesta fase)"; fi
