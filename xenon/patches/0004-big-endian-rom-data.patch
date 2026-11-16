@@ -271,3 +271,16 @@ index 9147e26..497cbbf 100644
  #define STAN_PTCOUNT(tailhalf) (((tailhalf) >> 12) & 0xf)
  /* nibble of mid.half by its IDO shift (special=12, r=8, g=4, b=0) */
  #define STAN_MID_NIB(half, ido_shift) (((half) >> (ido_shift)) & 0xF)
+diff --git a/src/game/tex.c b/src/game/tex.c
+index d619150..0c57e4f 100644
+--- a/src/game/tex.c
++++ b/src/game/tex.c
+@@ -1174,7 +1174,7 @@ void texCopyGdls(Gfx *arg0, Gfx *arg1, s32 arg2)
+ 
+     while (arg2--)
+     {
+-#ifdef TARGET_N64
++#if defined(TARGET_N64) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+         arg1->force_structure_alignment = arg0->force_structure_alignment;
+ #else
+         /* PC: the only callers are the room loaders (bg.c), staging the
