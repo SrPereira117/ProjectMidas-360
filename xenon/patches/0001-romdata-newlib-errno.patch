@@ -1,0 +1,11 @@
+--- a/port/src/romdata.c	2026-11-16 06:23:37.745516537 -0300
++++ b/port/src/romdata.c	2026-11-16 06:23:37.765286587 -0300
+@@ -74,6 +74,8 @@
+  * this is libc's own expansion, brought back under a port name */
+ #ifdef _WIN32
+ #define port_errno (*_errno())
++#elif defined(__XSDK__)
++#define port_errno (*__errno()) /* newlib (xsdk, Xbox 360) */
+ #else
+ #define port_errno (*__errno_location())
+ #endif
