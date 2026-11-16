@@ -136,5 +136,8 @@ target_compile_definitions(midas_xenon PRIVATE ${MIDAS_DEFS})
 target_compile_options(midas_xenon PRIVATE ${MIDAS_CFLAGS})
 target_include_directories(midas_xenon PRIVATE ${MIDAS_INCS}
     ${CMAKE_CURRENT_SOURCE_DIR}/compat ${CMAKE_BINARY_DIR}/generated)
+# A strtol do jogo (src/str.c) colide com a da newlib; as chamadas passam a usar a da newlib,
+# que se comporta igual para esses usos (argumentos de linha de comando e stan.c).
+set_source_files_properties(${MIDAS_DIR}/src/str.c PROPERTIES COMPILE_DEFINITIONS "strtol=midas_strtol")
 target_link_libraries(midas_xenon m)
 xsdk_add_xex(midas_xenon TITLE_ID 0x47454D44 NAME "GoldenEye Midas" VERSION 0.0.1.0)
