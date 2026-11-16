@@ -31,7 +31,10 @@ typedef struct {
 static struct {
     int ok;
     uint16_t button;
-    int8_t sx, sy;
+    int8_t sx, sy;     /* analogico esquerdo */
+    int8_t rx, ry;     /* analogico direito */
+    int look_on_pad1;  /* estilos 2.2/2.4: o direito vira o analogico do controle 1 */
+    int mute_c;        /* o direito mira: nao dispara os botoes C */
 } g_pad[4];
 static uint32_t g_connected = 1;
 
@@ -52,6 +55,7 @@ static void poll_pad(int i)
     g_pad[i].ok = 0;
     g_pad[i].button = 0;
     g_pad[i].sx = g_pad[i].sy = 0;
+    g_pad[i].rx = g_pad[i].ry = 0;
     if (XamInputGetState((uint32_t)i, 0, &st) != 0) return;
     g_pad[i].ok = 1;
     const INPUT_GAMEPAD *g = &st.gamepad;
@@ -73,6 +77,8 @@ static void poll_pad(int i)
     g_pad[i].button = b;
     g_pad[i].sx = scale_stick(g->thumb_lx);
     g_pad[i].sy = scale_stick(g->thumb_ly);
+    g_pad[i].rx = scale_stick(g->thumb_rx);
+    g_pad[i].ry = scale_stick(g->thumb_ry);
 }
 
 typedef int32_t s32;
@@ -107,11 +113,17 @@ void portInputPollTick(void)
 void portInputPadMerge(s32 idx, void *pad)
 {
     PadRaw *p = (PadRaw *)pad;
+    uint16_t b;
+    int8_t x, y;
     if (idx < 0 || idx > 3 || !g_pad[idx].ok) return;
-    p->button |= g_pad[idx].button;
-    if (g_pad[idx].sx || g_pad[idx].sy) {
-        p->stick_x = g_pad[idx].sx;
-        p->stick_y = g_pad[idx].sy;
+    b = g_pad[idx].button;
+    if (g_pad[idx].mute_c) b &= (uint16_t)~(N64_CU | N64_CD | N64_CL | N64_CR);
+    p->button |= b;
+    x = g_pad[idx].look_on_pad1 ? g_pad[idx].rx : g_pad[idx].sx;
+    y = g_pad[idx].look_on_pad1 ? g_pad[idx].ry : g_pad[idx].sy;
+    if (x || y) {
+        p->stick_x = x;
+        p->stick_y = y;
     }
 }
 void portInputPadNeutral(s32 idx) { (void)idx; }
@@ -119,13 +131,20 @@ void portInputPadGadgetChord(s32 idx, void *pad) { (void)idx; (void)pad; }
 void portInputStickGate(void *pad, s32 slot) { (void)pad; (void)slot; }
 u32 portInputPadMask(void) { return g_connected; }
 f32 portInputPadActionLevel(s32 slot, s32 act) { (void)slot; (void)act; return 0.0f; }
-s32 portInputPadTwinStickCapable(s32 idx) { (void)idx; return 0; }
+s32 portInputPadTwinStickCapable(s32 idx) { return idx >= 0 && idx < 4 && g_pad[idx].ok; }
 s32 portInputPadTwinStick(s32 idx, s8 *x, s8 *y, s32 muteC, s32 lookOnPad1)
 {
-    (void)idx; (void)muteC; (void)lookOnPad1;
-    if (x) *x = 0;
-    if (y) *y = 0;
-    return 0;
+    /* o "segundo controle" do jogo: o analogico direito (mira) ou, nos estilos 2.2/2.4, o esquerdo (andar) */
+    if (idx < 0 || idx > 3 || !g_pad[idx].ok) {
+        if (x) *x = 0;
+        if (y) *y = 0;
+        return 0;
+    }
+    g_pad[idx].mute_c = muteC ? 1 : 0;
+    g_pad[idx].look_on_pad1 = lookOnPad1 ? 1 : 0;
+    if (x) *x = lookOnPad1 ? g_pad[idx].sx : g_pad[idx].rx;
+    if (y) *y = lookOnPad1 ? g_pad[idx].sy : g_pad[idx].ry;
+    return 1;
 }
 s32 portInputPadSeedForKey(const char *key) { (void)key; return 0; }
 s32 portInputSetOption(const char *key, const char *value) { (void)key; (void)value; return 0; }

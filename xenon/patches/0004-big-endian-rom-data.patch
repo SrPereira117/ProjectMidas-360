@@ -134,6 +134,19 @@ index 5df8e99..bcfd4de 100644
  #define _mkshort(a, b)            ((a << 8) | (b & 0xff))
  #define _mkword(a, b)             ((a << 16) | (b & 0xffff))
  #else
+diff --git a/src/game/bg.c b/src/game/bg.c
+index 7209f94..15a976f 100644
+--- a/src/game/bg.c
++++ b/src/game/bg.c
+@@ -2995,7 +2995,7 @@ s32 bgLoadRoomVtxData(s32 roomnum, u8 *dst, s32 len)
+     obLoadBGFileBytesAtOffset(levelinfotable[levelentry_index].bg_seg_filename, dst + (len - alignedsize), offset, alignedsize);
+     result = bgDecompress(dst + (len - alignedsize), dst);
+ 
+-#ifndef TARGET_N64
++#if !defined(TARGET_N64) && !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+     /* The decompressed point table is a byte-exact big-endian N64 image, but
+      * every consumer (gfx_sp_vertex, the vtx-batch bounds builder, the
+      * shot-impact bbox walker) reads Vtx fields natively, so all six s16s per
 diff --git a/src/game/bondview.h b/src/game/bondview.h
 index c7e993f..0613ade 100644
 --- a/src/game/bondview.h
