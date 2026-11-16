@@ -73,6 +73,21 @@ jobs:
           echo "##### XEX"; ls -l build-midas/*.xex 2>&1 || true
           if [ "${{ steps.build.outcome }}" = "failure" ]; then echo "BUILD FALHOU (esperado nesta fase)"; fi
 
+      - name: Resolver enderecos de falha (xenon/resolve.txt)
+        if: always()
+        run: |
+          if [ -s xenon/resolve.txt ] && [ -f build-midas/midas_xenon ]; then
+            echo "##### ENDERECOS -> FUNCAO"
+            while read -r a; do
+              [ -n "$a" ] && echo "$a -> $("$PREFIX/bin/powerpc-xsdk-elf-addr2line" -f -C -e build-midas/midas_xenon "$a" | tr '\n' ' ')"
+            done < xenon/resolve.txt
+            echo "##### SIMBOLOS VIZINHOS DO PRIMEIRO ENDERECO"
+            first=$(head -1 xenon/resolve.txt)
+            "$PREFIX/bin/powerpc-xsdk-elf-nm" -n build-midas/midas_xenon | awk -v a="$first" 'BEGIN{t=strtonum(a)} {v=strtonum("0x"$1); if(v<=t){p3=p2;p2=p1;p1=$0} else if(!d){print p3;print p2;print p1;print $0;d=1}}'
+          else
+            echo "sem enderecos em xenon/resolve.txt: nada a resolver"
+          fi
+
       - name: Guardar o .xex
         if: always()
         uses: actions/upload-artifact@v4
