@@ -19,7 +19,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_EXTENSIONS ON)
 
 set(MIDAS_DEFS VERSION_US LANG_US REFRESH_NTSC LEFTOVERDEBUG LEFTOVERSPECTRUM BUGFIX_R0
-               NONMATCHING AVOID_UB _LANGUAGE_C GE_VIDEO=1)
+               NONMATCHING AVOID_UB _LANGUAGE_C GE_VIDEO=1 GE_XENON=1)
 # Flags do Midas, menos o que e x86 (-m32, -msse2, frame pointer do crash handler).
 # -ffp-contract=off: sem fused multiply-add, para os floats arredondarem como no N64.
 set(MIDAS_CFLAGS -ffreestanding -fms-extensions -fno-strict-aliasing -fwrapv -funsigned-char

@@ -1,8 +1,74 @@
 diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
-index 8900755..e4e2ffd 100644
+index 8900755..56447f9 100644
 --- a/port/fast3d/gfx_pc.cpp
 +++ b/port/fast3d/gfx_pc.cpp
-@@ -7629,6 +7629,18 @@ static void gfx_run_dl(Gfx* cmd) {
+@@ -270,7 +270,7 @@ static struct RSP {
+         uint16_t s, t;
+     } texture_scaling_factor;
+ 
+-    struct LoadedVertex loaded_vertices[MAX_VERTICES + 4];
++    struct LoadedVertex loaded_vertices[MAX_VERTICES + 8]; /* +4..+7: near-plane clip temporaries */
+ 
+     // PD-only vertex-color palette (G_COL): GE's stock Vtx carries RGBA
+     // inline, and GE's 0x07 is G_RESERVED2 (never emitted). Dead-gated.
+@@ -3651,6 +3651,56 @@ static int gfx_ge_farclip_mode(void) {
+ #include "gfx_roomcache.inl"
+ 
+ static void gfx_sp_tri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx, bool is_rect) {
++#if defined(GE_XENON)
++    {
++        /* The Midas GL path draws with GL_DEPTH_CLAMP: nothing is cut at the near plane, only
++         * at w <= 0. The Xenos cannot clip one plane alone, so cut the triangle at w = eps here
++         * (the vertex shader clamps z), else geometry right in front of the eye is lost. */
++        static bool in_nearclip = false;
++        const float eps = 2.0f;
++        if (!is_rect && !in_nearclip && roc_capturing == nullptr) {
++            struct LoadedVertex* a[3] = { &rsp.loaded_vertices[vtx1_idx], &rsp.loaded_vertices[vtx2_idx],
++                                          &rsp.loaded_vertices[vtx3_idx] };
++            int nin = 0;
++            for (int i = 0; i < 3; i++) if (a[i]->w >= eps) nin++;
++            if (nin > 0 && nin < 3) {
++                struct LoadedVertex out[4];
++                int n = 0;
++                for (int i = 0; i < 3; i++) {
++                    const struct LoadedVertex* p0 = a[i];
++                    const struct LoadedVertex* p1 = a[(i + 1) % 3];
++                    const bool in0 = p0->w >= eps, in1 = p1->w >= eps;
++                    if (in0) out[n++] = *p0;
++                    if (in0 != in1) {
++                        const float t = (eps - p0->w) / (p1->w - p0->w);
++                        struct LoadedVertex nv = *p0;
++                        nv.x = p0->x + t * (p1->x - p0->x);
++                        nv.y = p0->y + t * (p1->y - p0->y);
++                        nv.z = p0->z + t * (p1->z - p0->z);
++                        nv.w = eps;
++                        nv.u = p0->u + t * (p1->u - p0->u);
++                        nv.v = p0->v + t * (p1->v - p0->v);
++                        nv.color.r = (uint8_t) (p0->color.r + t * ((float) p1->color.r - p0->color.r) + 0.5f);
++                        nv.color.g = (uint8_t) (p0->color.g + t * ((float) p1->color.g - p0->color.g) + 0.5f);
++                        nv.color.b = (uint8_t) (p0->color.b + t * ((float) p1->color.b - p0->color.b) + 0.5f);
++                        nv.color.a = (uint8_t) (p0->color.a + t * ((float) p1->color.a - p0->color.a) + 0.5f);
++                        nv.fog = (uint8_t) (p0->fog + t * ((float) p1->fog - p0->fog) + 0.5f);
++                        nv.clip_rej = 0;
++                        out[n++] = nv;
++                    }
++                }
++                if (n >= 3) {
++                    for (int i = 0; i < n; i++) rsp.loaded_vertices[MAX_VERTICES + 4 + i] = out[i];
++                    in_nearclip = true;
++                    gfx_sp_tri1(MAX_VERTICES + 4, MAX_VERTICES + 5, MAX_VERTICES + 6, false);
++                    if (n == 4) gfx_sp_tri1(MAX_VERTICES + 4, MAX_VERTICES + 6, MAX_VERTICES + 7, false);
++                    in_nearclip = false;
++                }
++                return;
++            }
++        }
++    }
++#endif
+     ge_flush_origin = is_rect ? 1u : (ge_tri_origin & 15u);
+     roc_stat_tri_origin[ge_flush_origin]++;
+     struct LoadedVertex* v1 = &rsp.loaded_vertices[vtx1_idx];
+@@ -7629,6 +7679,18 @@ static void gfx_run_dl(Gfx* cmd) {
                      }
                      fflush(stderr);
                  }
