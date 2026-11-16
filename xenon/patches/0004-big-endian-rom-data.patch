@@ -377,7 +377,7 @@ index 7209f94..1f1689a 100644
       * every consumer (gfx_sp_vertex, the vtx-batch bounds builder, the
       * shot-impact bbox walker) reads Vtx fields natively, so all six s16s per
 diff --git a/src/game/bgfog.c b/src/game/bgfog.c
-index 9b2741b..ca2d28c 100644
+index 9b2741b..162eb03 100644
 --- a/src/game/bgfog.c
 +++ b/src/game/bgfog.c
 @@ -622,6 +622,12 @@ void fogSwitchToSolosky2(f32 arg0)
@@ -393,6 +393,18 @@ index 9b2741b..ca2d28c 100644
      static_envr = *g_EnvironmentMainp;
  
      static_envr.Visibility.BlendMultiplier =
+@@ -855,6 +861,11 @@ s32 fogGetPropDistColor(PropRecord *prop, rgba_f32 *color)
+ static void portFogSwapEntry(u8 *p, const u16 *w4, int n4, const u16 *w2, int n2)
+ {
+     int i;
++#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++    /* the ROM tables are big-endian already: nothing to swap on a BE host */
++    (void) p; (void) w4; (void) n4; (void) w2; (void) n2;
++    return;
++#endif
+     for (i = 0; i < n4; i++) {
+         u8 *q = p + w4[i], t;
+         t = q[0]; q[0] = q[3]; q[3] = t;
 diff --git a/src/game/bondview.h b/src/game/bondview.h
 index c7e993f..0613ade 100644
 --- a/src/game/bondview.h
