@@ -8,12 +8,6 @@
 
 typedef int32_t s32;
 
-/* --- input_pc.c do Midas (SDL) ------------------------------------------------ */
-s32 portInputDeviceModeRaw(s32 dev) { (void)dev; return 0; }          /* 0: automatico */
-const char *portInputLayoutShown(s32 dev) { (void)dev; return ""; }
-s32 portInputLayoutInUse(s32 dev) { (void)dev; return 0; }
-s32 portInputPadResetDefaults(s32 dev) { (void)dev; return 0; }
-
 /* --- audio_pc.c do Midas (SDL): sem som por enquanto ------------------------------- */
 void portAudioPump(void) {}
 void portAudioPumpForce(void) {}

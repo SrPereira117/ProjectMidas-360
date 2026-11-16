@@ -257,3 +257,27 @@ GfxWindowManagerAPI make_wapi()
 /* Os objetos que o video.c do Midas espera (no PC vem de gfx_sdl2.cpp e gfx_opengl.cpp). */
 GfxRenderingAPI gfx_opengl_api = make_rapi();
 GfxWindowManagerAPI gfx_sdl = make_wapi();
+
+/* ---- Simbolos que o Fast3D e o video.c esperam de gfx_opengl.cpp / gfx_sdl2.cpp -------------------- */
+extern "C" {
+unsigned g_GfxUploadError, g_GfxUploadErrorCount;
+unsigned g_GfxUpW, g_GfxUpH;
+unsigned long long g_GfxUpDrainUs, g_GfxUpTexUs, g_GfxUpMipUs, g_GfxUpErrUs;
+int g_GfxPresentX = 0;
+int g_GfxPresentW = 0;
+int ge_shot_force = 0;
+
+unsigned gfx_opengl_poll_gl_error(void) { return 0; }
+void gfx_opengl_retained_stats(unsigned *draws, unsigned *tris, unsigned *buffers, unsigned *descs)
+{
+    if (draws) *draws = 0;
+    if (tris) *tris = 0;
+    if (buffers) *buffers = 0;
+    if (descs) *descs = 0;
+}
+int gfx_vsync_pacing(void) { return 0; }
+int gfx_display_refresh_hz(void) { return 60; }
+void gfx_sdl_gl_make_current(void) {}
+void gfx_sdl_gl_release_current(void) {}
+int gfx_sdl_get_saved_geometry(int *, int *, int *, int *, int *) { return 0; }
+}
