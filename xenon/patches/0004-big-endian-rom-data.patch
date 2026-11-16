@@ -271,6 +271,28 @@ index 9b37bcf..7d8a5ed 100644
  #endif
  
          // Pad names and bound names are optional. An offset of 0 means absent.
+diff --git a/src/game/ramromreplay.c b/src/game/ramromreplay.c
+index c08baa4..f659a57 100644
+--- a/src/game/ramromreplay.c
++++ b/src/game/ramromreplay.c
+@@ -116,11 +116,17 @@ void copy_recorded_ramrom_registers_to_proper_place_ingame(ramromfilestructure *
+ 
+ static u32 port_ramrom_swap32(u32 v)
+ {
++#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++    return v; /* the demo is already in host order */
++#endif
+     return (v >> 24) | ((v >> 8) & 0xFF00) | ((v & 0xFF00) << 8) | (v << 24);
+ }
+ 
+ static u64 port_ramrom_swap64(u64 v)
+ {
++#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++    return v;
++#endif
+     return ((u64) port_ramrom_swap32((u32) v) << 32) | port_ramrom_swap32((u32) (v >> 32));
+ }
+ 
 diff --git a/src/game/stan.c b/src/game/stan.c
 index df375ec..4c40b2c 100644
 --- a/src/game/stan.c
