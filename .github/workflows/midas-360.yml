@@ -1,0 +1,57 @@
+name: midas-360-compile-check
+
+# Mapa rapido de erros: tenta compilar o Project Midas com o compilador do xsdk
+# (powerpc-xsdk-elf-gcc) e lista o que falha. Nao gera .xex ainda.
+on:
+  workflow_dispatch:
+  push:
+    branches: [midas-360]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PREFIX: ${{ github.workspace }}/xsdk-gcc
+    steps:
+      - name: Este repositorio
+        uses: actions/checkout@v4
+
+      - name: Baixar o xsdk
+        uses: actions/checkout@v4
+        with:
+          repository: xenosworks/xsdk
+          path: xsdk
+
+      - name: Toolchain do xsdk (do cache do build-xsdk-samples)
+        uses: actions/cache/restore@v4
+        with:
+          path: xsdk-gcc
+          key: xsdk-toolchain-${{ hashFiles('xsdk/tools/toolchain/**') }}
+          restore-keys: xsdk-toolchain-
+
+      - name: Conferir o compilador
+        run: |
+          if [ ! -x "$PREFIX/bin/powerpc-xsdk-elf-gcc" ]; then
+            echo "::error::Toolchain nao esta no cache. Rode o workflow build-xsdk-samples na main primeiro."
+            exit 1
+          fi
+          "$PREFIX/bin/powerpc-xsdk-elf-gcc" --version | head -1
+
+      - name: Baixar o Project Midas (versao fixa 1.0.2b)
+        run: git clone --depth 1 --branch 1.0.2b https://github.com/murkantor/Project-Midas midas
+
+      - name: Verificar a compilacao
+        run: bash tools/compile_check.sh midas "$PREFIX/bin/powerpc-xsdk-elf-gcc" report
+
+      - name: Resumo
+        if: always()
+        run: |
+          { echo '## Compilacao do Midas para o 360'; echo '```'; tail -1 report/summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar o relatorio
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: midas-compile-report
+          path: report/
