@@ -34,7 +34,7 @@ jobs:
         if: steps.tc.outputs.cache-hit != 'true'
         working-directory: xsdk
         run: |
-          PREFIX=$PREFIX WORK=$RUNNER_TEMP/xsdk-gcc-work JOBS=$(nproc) tools/toolchain/build.sh
+          PREFIX=$PREFIX WORK=$RUNNER_TEMP/xsdk-gcc-work JOBS=$(nproc) bash tools/toolchain/build.sh
           $PREFIX/bin/powerpc-xsdk-elf-gcc --version
 
       - name: Compilar o glslang-xenon
