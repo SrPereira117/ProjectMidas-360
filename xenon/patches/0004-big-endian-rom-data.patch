@@ -1,0 +1,167 @@
+diff --git a/port/src/romdata.c b/port/src/romdata.c
+index 5af83d8..22e19ce 100644
+--- a/port/src/romdata.c
++++ b/port/src/romdata.c
+@@ -771,9 +771,11 @@ static enum romfileclass romdataClassOf(const char *name)
+             /* the three inline-texture menu models embed segment-5 texture
+              * blobs (objecthandler_2.c portSwapInlineTextures) that the model
+              * converter does not yet handle - keep them compiled for now */
++#if !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+             if (strcmp(name, "PlegalpageZ") == 0 || strcmp(name, "PnintendologoZ") == 0 || strcmp(name, "PgoldeneyelogoZ") == 0) {
+                 return CLASS_NONE;
+             }
++#endif /* big-endian host (Xbox 360): there is no compiled copy, and the ROM bytes are already in host order */
+             return CLASS_MODEL; /* C<name>Z chr, G<name>Z gun, P<name>Z prop - converted in load_object_fill_header */
+         }
+     }
+@@ -986,6 +988,9 @@ void romdataFilePreprocess(s32 index, u8 *data, u32 size)
+         /* struct BriefStruct: u16 brief[4] + 10 x {u16 text, u16 difficulty} = 24 halfwords */
+         if (size >= 48) {
+             u32 i;
++#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++            i = 48; /* already in host order */
++#else
+             for (i = 0; i < 48; i += 2) {
+                 u8 t = data[i];
+                 data[i] = data[i + 1];
+@@ -995,6 +1000,7 @@ void romdataFilePreprocess(s32 index, u8 *data, u32 size)
+                 portConLogf("ge: romdata: brief %-16s %s the compiled-in file\n", file_resource_table[index].filename,
+                         memcmp(sCompiledData[index], data, 48) == 0 ? "identical to" : "DIFFERS from");
+             }
++#endif
+         } else {
+             portConLogf("ge: romdata: brief %s: %u bytes, expected 48\n", file_resource_table[index].filename, size);
+         }
+diff --git a/port/src/romfile_bg.c b/port/src/romfile_bg.c
+index 81c6f78..ebdd0c9 100644
+--- a/port/src/romfile_bg.c
++++ b/port/src/romfile_bg.c
+@@ -39,6 +39,10 @@ static u32 bg_be32(const u8 *p)
+ 
+ static void bg_swap4(u8 *p)
+ {
++#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++    (void) p; /* the cart image is already in host order */
++    return;
++#endif
+     u8 t = p[0]; p[0] = p[3]; p[3] = t;
+     t = p[1]; p[1] = p[2]; p[2] = t;
+ }
+diff --git a/port/src/romfile_setup.c b/port/src/romfile_setup.c
+index 12f18fb..7c3ba2f 100644
+--- a/port/src/romfile_setup.c
++++ b/port/src/romfile_setup.c
+@@ -59,6 +59,10 @@ static u32 be32(const u8 *p)
+ static void kindApply(u8 *w, int kind)
+ {
+     u8 t;
++#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++    (void) w; (void) kind; /* the cart image is already in host order */
++    return;
++#endif
+     switch (kind) {
+     case SETUP_KIND_K32:
+         t = w[0]; w[0] = w[3]; w[3] = t;
+diff --git a/port/src/romfile_stan.c b/port/src/romfile_stan.c
+index 986e687..b750011 100644
+--- a/port/src/romfile_stan.c
++++ b/port/src/romfile_stan.c
+@@ -43,6 +43,10 @@ static void put32(u8 *p, u32 v)
+ 
+ static void swap16(u8 *p)
+ {
++#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++    (void) p;
++    return;
++#endif
+     u8 t = p[0];
+     p[0] = p[1];
+     p[1] = t;
+@@ -51,6 +55,10 @@ static void swap16(u8 *p)
+ /* N64 halfword (BE bytes) with nibbles reversed -> host u16 */
+ static void nibbleReverse(u8 *p)
+ {
++#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++    (void) p; /* MSB-first bitfields already match the cart */
++    return;
++#endif
+     u16 v = (u16) (((u16) p[0] << 8) | p[1]);
+     u16 r = (u16) (((v & 0xF) << 12) | ((v & 0xF0) << 4) | ((v >> 4) & 0xF0) | (v >> 12));
+     memcpy(p, &r, 2);
+@@ -98,7 +106,9 @@ s32 romfileStanConvert(u8 *data, u32 size, const char *name, const u8 *compiled)
+             portConLogf("ge: romdata: stan %s: tile %u at 0x%X has %u points (size %u) - walk stopped\n", name, ntiles, o, count, tsize);
+             return 0;
+         }
++#if !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+         put32(data + o, (w0 >> 8) | (w0 << 24)); /* id:24 | room:8 -> GCC LSB-first unit */
++#endif
+         nibbleReverse(data + o + 4);
+         nibbleReverse(data + o + 6);
+         for (p = 0; p < count; p++) {
+diff --git a/src/game/image.c b/src/game/image.c
+index 08b0e95..73f89a0 100644
+--- a/src/game/image.c
++++ b/src/game/image.c
+@@ -376,7 +376,7 @@ s32 texInflateZlib(u8 *src, u8 *dst, s32 arg2, s32 forcenumimages, struct texpoo
+     for (i = 0; i < numcolours; i++)
+     {
+         if ((!totalbytesout) && (!totalbytesout));
+-#ifdef TARGET_N64
++#if defined(TARGET_N64) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+         dst[totalbytesout + 0] = palette[i] >> 8;
+         dst[totalbytesout + 1] = palette[i] & 0xff;
+ #else
+diff --git a/src/game/language.c b/src/game/language.c
+index 281ace8..c3ba49d 100644
+--- a/src/game/language.c
++++ b/src/game/language.c
+@@ -1,4 +1,5 @@
+ #include <ultra64.h>
++#include <stdio.h>
+ #include <bondgame.h>
+ #include <memp.h>
+ #include "language.h"
+@@ -432,6 +433,14 @@ u8 * langGet(s32 slotID)
+      * unconditionally. */
+     if (textbank_ptr == NULL)
+     {
++        {
++            static unsigned long long s_seen;
++            if (!(s_seen & (1ull << bank_id)))
++            {
++                s_seen |= 1ull << bank_id;
++                fprintf(stderr, "ge: langGet: text bank %u (slot %u) not loaded\n", (unsigned) bank_id, (unsigned) (slotID & 0x3FF));
++            }
++        }
+         return (u8 *)"Error: Bank not loaded";
+     }
+ #endif
+diff --git a/src/game/objecthandler_2.c b/src/game/objecthandler_2.c
+index 8d98e2a..c1f868c 100644
+--- a/src/game/objecthandler_2.c
++++ b/src/game/objecthandler_2.c
+@@ -208,6 +208,11 @@ static void portSwapInlineTextures(struct ModelFileHeader *objheader, u8 *fileda
+     s32 i;
+     s32 slot;
+ 
++#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++    /* big-endian host: the model bytes are the N64's already, nothing to swap */
++    (void) objheader; (void) filedata; (void) i; (void) slot;
++    return;
++#endif
+     for (slot = 0; slot < INLINE_TEX_SWAP_MAX; slot++)
+     {
+         if (s_InlineTexSwapped[slot] == filedata)
+diff --git a/src/game/stan.h b/src/game/stan.h
+index 9147e26..497cbbf 100644
+--- a/src/game/stan.h
++++ b/src/game/stan.h
+@@ -18,7 +18,7 @@
+  * MSB-first bitfield position (top nibble, >>12) but GCC packs LSB-first, so
+  * the compiled-in stan data holds it in the low nibble. One macro handles both
+  * packings; the N64 arm expands to the original expression. */
+-#ifdef TARGET_N64
++#if defined(TARGET_N64) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+ #define STAN_PTCOUNT(tailhalf) (((tailhalf) >> 12) & 0xf)
+ /* nibble of mid.half by its IDO shift (special=12, r=8, g=4, b=0) */
+ #define STAN_MID_NIB(half, ido_shift) (((half) >> (ido_shift)) & 0xF)
