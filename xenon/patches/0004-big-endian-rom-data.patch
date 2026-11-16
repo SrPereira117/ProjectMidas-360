@@ -135,10 +135,105 @@ index 5df8e99..bcfd4de 100644
  #define _mkword(a, b)             ((a << 16) | (b & 0xffff))
  #else
 diff --git a/src/game/bg.c b/src/game/bg.c
-index 7209f94..15a976f 100644
+index 7209f94..38df674 100644
 --- a/src/game/bg.c
 +++ b/src/game/bg.c
-@@ -2995,7 +2995,7 @@ s32 bgLoadRoomVtxData(s32 roomnum, u8 *dst, s32 len)
+@@ -1092,8 +1092,17 @@ void load_bg_file(LEVEL_INDEX levelid)
+     }
+ #endif
+ 
++#ifndef TARGET_N64
++    fprintf(stderr, "ge: bgload: stanDetermineEOF\n"); fflush(stderr);
++#endif
+     stanDetermineEOF((struct StanPrefixRecord *) gptr_stan, 0, (u8 *) gptr_stan);
++#ifndef TARGET_N64
++    fprintf(stderr, "ge: bgload: stanLoadFile\n"); fflush(stderr);
++#endif
+     stanLoadFile((struct StanPrefixRecord *) gptr_stan);
++#ifndef TARGET_N64
++    fprintf(stderr, "ge: bgload: stan loaded\n"); fflush(stderr);
++#endif
+  
+     sub_GAME_7F0B4810(levelinfotable[levelentry_index].levelscale);
+     setLevelScale(levelinfotable[levelentry_index].levelscale);
+@@ -1105,6 +1114,9 @@ void load_bg_file(LEVEL_INDEX levelid)
+     sub_GAME_7F08976C(mCurrentLevelVisibilityScale);
+     matrix_4x4_7F058C4C(mCurrentLevelVisibilityScale);
+  
++#ifndef TARGET_N64
++    fprintf(stderr, "ge: bgload: scale set\n"); fflush(stderr);
++#endif
+     data = (s32 *)ptr_bg_data;
+     dword_CODE_bss_8007BF98 = *data;
+     dword_CODE_bss_8007FF88 = 1;
+@@ -1257,12 +1269,24 @@ void load_bg_file(LEVEL_INDEX levelid)
+             g_BgRoomInfo[i].cur_room_totalsize = -1;
+         }
+  
++#ifndef TARGET_N64
++        fprintf(stderr, "ge: bgload: rooms sized\n"); fflush(stderr);
++#endif
+         initializeRoomData();
++#ifndef TARGET_N64
++        fprintf(stderr, "ge: bgload: initializeRoomData done\n"); fflush(stderr);
++#endif
+  
+         for (i = 1; i < g_MaxNumRooms; i++)
+         {
+             bgRoomCalcBB(i);
++#ifndef TARGET_N64
++            if ((i % 10) == 0) { fprintf(stderr, "ge: bgload: calcBB room %d\n", i); fflush(stderr); }
++#endif
+         }
++#ifndef TARGET_N64
++        fprintf(stderr, "ge: bgload: calcBB done\n"); fflush(stderr);
++#endif
+ 
+ #ifndef TARGET_N64
+         {
+@@ -1275,16 +1299,25 @@ void load_bg_file(LEVEL_INDEX levelid)
+         {
+             D_800443C4[i] = sub_GAME_7F0B993C(i);
+         }
++#ifndef TARGET_N64
++        fprintf(stderr, "ge: bgload: portal metrics done\n"); fflush(stderr);
++#endif
+  
+         for (i = 0; g_BgPortals[i].offset_portal != (NULL); i++)
+         {
+             bgOrderPortal(i);
+         }
+  
++#ifndef TARGET_N64
++        fprintf(stderr, "ge: bgload: portals ordered\n"); fflush(stderr);
++#endif
+         for (i = 0; i < g_MaxNumRooms; i++)
+         {
+             sub_GAME_7F0B95D8(i);
+         }
++#ifndef TARGET_N64
++        fprintf(stderr, "ge: bgload: 95D8 done\n"); fflush(stderr);
++#endif
+  
+         for (i = 0; g_BgPortals[i].offset_portal != (NULL); i++)
+         {
+@@ -1292,9 +1325,15 @@ void load_bg_file(LEVEL_INDEX levelid)
+         }
+  
+         sub_GAME_7F0B37EC();
++#ifndef TARGET_N64
++        fprintf(stderr, "ge: bgload: 37EC done\n"); fflush(stderr);
++#endif
+     }
+  
+     fogRemoved7F0BAA5C(levelid);
++#ifndef TARGET_N64
++        fprintf(stderr, "ge: bgload: fog done\n"); fflush(stderr);
++#endif
+     g_RoomLoadBudget = 200;
+ }
+ 
+@@ -2995,7 +3034,7 @@ s32 bgLoadRoomVtxData(s32 roomnum, u8 *dst, s32 len)
      obLoadBGFileBytesAtOffset(levelinfotable[levelentry_index].bg_seg_filename, dst + (len - alignedsize), offset, alignedsize);
      result = bgDecompress(dst + (len - alignedsize), dst);
  
