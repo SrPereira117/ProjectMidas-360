@@ -6,8 +6,8 @@
 set -u
 MIDAS=$(cd "$1" && pwd)
 CC=$2
-OUT=$3
-mkdir -p "$OUT"
+mkdir -p "$3"
+OUT=$(cd "$3" && pwd)   # caminho absoluto: o script entra na pasta do Midas
 : > "$OUT/errors.log"
 : > "$OUT/summary.txt"
 
