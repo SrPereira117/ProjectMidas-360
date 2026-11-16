@@ -252,6 +252,19 @@ int main(int argc, char **argv)
     }
     fclose(flag);
     xsdk_log_write("xenon: run.txt encontrado: iniciando o nucleo do jogo (sem video nem audio, %d s)", RUN_SECONDS);
+    /* Padroes do 360, gravados so se o midas.ini ainda nao existe (o jogo cria um para PC, a 120 Hz). */
+    {
+        FILE *ini = fopen("game:/midas.ini", "rb");
+        if (ini) {
+            fclose(ini);
+        } else if ((ini = fopen("game:/midas.ini", "wb")) != NULL) {
+            fputs("[display]\nwindow_width=640\nwindow_height=480\nfullscreen=fullscreen\n"
+                  "msaa=1\nvsync=1\nmaxfps=60\ntickhz=60\nrender_thread=0\n"
+                  "music_volume=70\nsfx_volume=70\n", ini);
+            fclose(ini);
+            xsdk_log_write("xenon: midas.ini criado com os padroes do 360 (60 Hz)");
+        }
+    }
     /* O Midas procura a ROM em Data/ ou como baserom.u.z64; aqui dizemos qual e. */
     setenv("GE_ROM", found, 1);
     xsdk_log_write("xenon: captador de falhas: %u", RtlSetVectoredExceptionHandler((void *)fault_handler, (void *)fault_handler));
