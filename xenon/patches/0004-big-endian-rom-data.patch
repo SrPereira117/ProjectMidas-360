@@ -1,5 +1,5 @@
 diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
-index 8900755..56447f9 100644
+index 8900755..5e75406 100644
 --- a/port/fast3d/gfx_pc.cpp
 +++ b/port/fast3d/gfx_pc.cpp
 @@ -270,7 +270,7 @@ static struct RSP {
@@ -68,7 +68,43 @@ index 8900755..56447f9 100644
      ge_flush_origin = is_rect ? 1u : (ge_tri_origin & 15u);
      roc_stat_tri_origin[ge_flush_origin]++;
      struct LoadedVertex* v1 = &rsp.loaded_vertices[vtx1_idx];
-@@ -7629,6 +7679,18 @@ static void gfx_run_dl(Gfx* cmd) {
+@@ -4740,11 +4790,35 @@ ndcprobe_done:;
+         }
+     }
+ 
++#if defined(GE_XENON)
++    /* Depth of a perspective draw is linear in w: z = a*w + b. Geometry nearer than the near
++     * plane would be clamped per vertex (and the clamp smears across big polygons, giving the
++     * wrong occlusion), so remap the depth as if the near plane were a quarter as far. */
++    float ge_dA = 0.0f, ge_dB = 0.0f;
++    {
++        const float (*P)[4] = rsp.P_matrix;
++        if (P[2][3] != 0.0f && P[0][3] == 0.0f && P[1][3] == 0.0f && P[3][3] == 0.0f &&
++            P[0][2] == 0.0f && P[1][2] == 0.0f) {
++            const float al = P[2][2] / P[2][3], be = P[3][2];
++            if (al > 1.0f && be < 0.0f) {
++                const float n = -be / (al + 1.0f), f = -be / (al - 1.0f);
++                const float n2 = n * 0.25f;
++                if (n > 0.0f && f > n && n2 < f) {
++                    ge_dA = (f + n2) / (f - n2) - al;
++                    ge_dB = -2.0f * f * n2 / (f - n2) - be;
++                }
++            }
++        }
++    }
++#endif
+     for (int i = 0; i < 3; i++) {
+         float z = v_arr[i]->z, w = v_arr[i]->w;
+         if (dec_pull && w > 4.0f * ge_dec_pull) {
+             z += dec_pull_b * ge_dec_pull / (w - ge_dec_pull);
+         }
++#if defined(GE_XENON)
++        z += ge_dA * w + ge_dB;
++#endif
+         if (clip_parameters.z_is_from_0_to_1) {
+             z = (z + w) / 2.0f;
+         }
+@@ -7629,6 +7703,18 @@ static void gfx_run_dl(Gfx* cmd) {
                      }
                      fflush(stderr);
                  }
