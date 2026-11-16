@@ -44,6 +44,15 @@ jobs:
       - name: Verificar a compilacao
         run: bash tools/compile_check.sh midas "$PREFIX/bin/powerpc-xsdk-elf-gcc" report
 
+      - name: Imprimir o relatorio no log
+        if: always()
+        run: |
+          echo "##### ARQUIVOS COM ERRO"; grep '^FAIL' report/summary.txt || true
+          echo "##### TOTAL"; tail -1 report/summary.txt
+          echo "##### ERROS MAIS COMUNS"
+          grep -hE 'error|fatal' report/errors.log | sed -E 's/^[^ ]+: //' | sed -E "s/'[^']*'/'X'/g" | sort | uniq -c | sort -rn | head -25
+          echo "##### DETALHE (primeiros erros de cada arquivo)"; head -c 60000 report/errors.log
+
       - name: Resumo
         if: always()
         run: |
