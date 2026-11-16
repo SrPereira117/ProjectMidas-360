@@ -1,0 +1,66 @@
+diff --git a/port/src/romfile_model.c b/port/src/romfile_model.c
+index 49d99a6..8b0119f 100644
+--- a/port/src/romfile_model.c
++++ b/port/src/romfile_model.c
+@@ -37,6 +37,13 @@ extern void portConLogf(const char *fmt, ...);
+ /* one field to byteswap: offset within the record, width 4/2/1 */
+ struct mfld { u16 off; u8 w; };
+ 
++/* xenon: em host big-endian a ROM ja esta na ordem do host; nada a trocar */
++#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++#define PORT_HOST_BE 1
++#else
++#define PORT_HOST_BE 0
++#endif
++
+ #define F4(o) { (o), 4 }
+ #define F2(o) { (o), 2 }
+ /* a run of n W4 words starting at off - expanded inline where needed */
+@@ -66,6 +73,7 @@ static const struct mfld fInterlink[] = { F4(0), F4(4), F4(8), F4(0xc), F4(0x10)
+ static void swapFields(u8 *p, const struct mfld *f, int n)
+ {
+     int i;
++    if (PORT_HOST_BE) return;
+     for (i = 0; i < n; i++) {
+         u8 *w = p + f[i].off;
+         if (f[i].w == 4) {
+@@ -81,6 +89,7 @@ static void swapFields(u8 *p, const struct mfld *f, int n)
+ 
+ static void swap4run(u8 *p, u32 words)
+ {
++    if (PORT_HOST_BE) return;
+     while (words--) {
+         u8 t = p[0]; p[0] = p[3]; p[3] = t;
+         t = p[1]; p[1] = p[2]; p[2] = t;
+@@ -141,6 +150,7 @@ static int mark(struct mconv *c, u32 off, u32 len)
+ static void swapVertex(u8 *p)
+ {
+     int i;
++    if (PORT_HOST_BE) return;
+     for (i = 0; i < 12; i += 2) {
+         u8 t = p[i]; p[i] = p[i + 1]; p[i + 1] = t;
+     }
+@@ -172,7 +182,9 @@ static void swapPointUsage(struct mconv *c, u32 off, u32 count)
+     }
+     for (i = 0; i < count; i++) {
+         u8 *p = c->d + off + i * 2;
+-        u8 t = p[0]; p[0] = p[1]; p[1] = t;
++        u8 t = p[0];
++        if (PORT_HOST_BE) break;
++        p[0] = p[1]; p[1] = t;
+     }
+ }
+ 
+@@ -363,8 +375,11 @@ static void walk(struct mconv *c, u32 root)
+         c->done[off] = 1;
+         {
+             u8 *p = c->d + off;
+-            u8 t = p[0]; p[0] = p[1]; p[1] = t;   /* Opcode */
++            u8 t;
++            if (!PORT_HOST_BE) {
++            t = p[0]; p[0] = p[1]; p[1] = t;   /* Opcode */
+             t = p[2]; p[2] = p[3]; p[3] = t;       /* pad */
++            }
+             swap4run(p + 4, 5);                    /* Data,Parent,Next,Prev,Child */
+         }
+         c->nnodes++;
