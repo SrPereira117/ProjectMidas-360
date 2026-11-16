@@ -26,6 +26,53 @@ extern int midas_main(int argc, char **argv);
 #define ROM_SIZE   0xC00000u    /* 12.582.912 bytes: a cartucho (U) original */
 #define ROM_CRC32  0xB6330846u  /* crc32 da imagem inteira, em ordem z64 */
 
+
+/* ---- captador de falhas ------------------------------------------------------------------
+ * O xsdk ainda nao tem um. Usa RtlSetVectoredExceptionHandler (docs/HARDWARE.md do xsdk, "How the
+ * kernel hands a title its faults"): r3 aponta para {registro da excecao, contexto}. Grava no log o
+ * tipo, o endereco da instrucao, o endereco acessado, os registradores e a pilha; depois encerra. */
+extern uint32_t RtlSetVectoredExceptionHandler(void *first, void *handler);
+extern void XamLoaderTerminateTitle(void);
+
+static int in_fault;
+
+static uint32_t rd32(const void *base, uint32_t off)
+{
+    return *(const uint32_t *)((const uint8_t *)base + off);
+}
+
+static int fault_handler(void **ptrs)
+{
+    const void *rec, *ctx;
+    uint32_t i, sp, n;
+
+    if (in_fault) XamLoaderTerminateTitle();
+    in_fault = 1;
+    rec = ptrs[0];
+    ctx = ptrs[1];
+    xsdk_log_write("FALHA: codigo %08X, instrucao em %08X, %u parametros",
+                   rd32(rec, 0), rd32(rec, 0xC), rd32(rec, 0x10));
+    if (rd32(rec, 0x10) >= 2)
+        xsdk_log_write("FALHA: %s no endereco %08X",
+                       rd32(rec, 0x14) ? "escrita" : "leitura", rd32(rec, 0x18));
+    xsdk_log_write("FALHA: IAR=%08X LR=%08X CTR=%08X CR=%08X XER=%08X",
+                   rd32(ctx, 0x8), rd32(ctx, 0xC), rd32(ctx, 0x14), rd32(ctx, 0x118), rd32(ctx, 0x11C));
+    for (i = 0; i < 32; i += 4)
+        xsdk_log_write("FALHA: r%u=%08X r%u=%08X r%u=%08X r%u=%08X",
+                       i, rd32(ctx, 0x1C + 8 * i), i + 1, rd32(ctx, 0x1C + 8 * (i + 1)),
+                       i + 2, rd32(ctx, 0x1C + 8 * (i + 2)), i + 3, rd32(ctx, 0x1C + 8 * (i + 3)));
+    sp = rd32(ctx, 0x1C + 8);
+    for (n = 0; n < 24; n++) {
+        uint32_t next = *(const uint32_t *)(uintptr_t)sp;
+        if (next <= sp || next - sp > 0x1000000u || (next & 3)) break;
+        xsdk_log_write("FALHA: pilha %2u: retorno %08X (sp %08X)", n, *(const uint32_t *)(uintptr_t)(next + 4), next);
+        sp = next;
+    }
+    xsdk_log_write("FALHA: fim do relatorio");
+    XamLoaderTerminateTitle();
+    return 0;
+}
+
 static uint32_t crc32_table[256];
 
 static void crc32_init(void)
@@ -207,6 +254,7 @@ int main(int argc, char **argv)
     xsdk_log_write("xenon: run.txt encontrado: iniciando o nucleo do jogo (sem video nem audio, %d s)", RUN_SECONDS);
     /* O Midas procura a ROM em Data/ ou como baserom.u.z64; aqui dizemos qual e. */
     setenv("GE_ROM", found, 1);
+    xsdk_log_write("xenon: captador de falhas: %u", RtlSetVectoredExceptionHandler((void *)fault_handler, (void *)fault_handler));
     {
         pthread_t t;
         if (pthread_create(&t, NULL, watchdog, NULL) == 0)

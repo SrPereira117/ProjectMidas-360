@@ -38,7 +38,10 @@ jobs:
 
       - name: Compilar a biblioteca do xsdk
         working-directory: xsdk
-        run: make -j"$(nproc)" TOOLCHAIN="$PREFIX/bin/powerpc-xsdk-elf-" build/libxsdk.a
+        run: |
+          # importa o gancho de falhas do kernel (usado por xenon/xenon_main.c)
+          echo "xboxkrnl.exe  0x36D  RtlSetVectoredExceptionHandler" >> imports/imports.txt
+          make -j"$(nproc)" TOOLCHAIN="$PREFIX/bin/powerpc-xsdk-elf-" build/libxsdk.a
 
       - name: Baixar o Project Midas (versao fixa 1.0.2b)
         run: git clone --depth 1 --branch 1.0.2b https://github.com/murkantor/Project-Midas midas
