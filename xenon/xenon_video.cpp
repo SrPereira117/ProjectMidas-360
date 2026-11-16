@@ -748,6 +748,32 @@ void r_start_frame()
 void r_end_frame()
 {
     g_frames++;
+    {   /* picos de tempo de quadro: o log diz o que aquele quadro fez */
+        static double last = 0.0;
+        static uint64_t pd, pt, pu, ps, said;
+        static double worst = 0.0;
+        timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        const double now = (double) ts.tv_sec + (double) ts.tv_nsec * 1e-9;
+        if (last > 0.0) {
+            const double ms = (now - last) * 1000.0;
+            if (ms > worst) worst = ms;
+            if (ms > 45.0 && said < 400) {
+                said++;
+                xsdk_log_write("xenon: video: pico %.0f ms no quadro %llu (%llu desenhos, %llu triangulos, %llu texturas novas, "
+                               "%llu shaders compilados)",
+                               ms, (unsigned long long) g_frames, (unsigned long long) (g_draws - pd),
+                               (unsigned long long) (g_tris - pt), (unsigned long long) (g_uploads - pu),
+                               (unsigned long long) (g_shaders_compiled - ps));
+            }
+        }
+        last = now;
+        pd = g_draws; pt = g_tris; pu = g_uploads; ps = g_shaders_compiled;
+        if ((g_frames % 300) == 0) {
+            xsdk_log_write("xenon: video: pior quadro dos ultimos 300: %.0f ms", worst);
+            worst = 0.0;
+        }
+    }
     if ((g_frames % 300) == 0)
         xsdk_log_write("xenon: video: %llu quadros, %llu desenhos (%llu pulados), %llu triangulos, %llu texturas, shaders: "
                        "%llu compilados %llu lidos",

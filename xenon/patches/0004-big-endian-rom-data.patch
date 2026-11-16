@@ -142,6 +142,58 @@ index 8900755..89209c6 100644
                  sysFatalError("Unknown GBI opcode 0x%02x at %p.\nw0 %08x\nw1 %08x", opcode, cmd, cmd->words.w0, cmd->words.w1);
                  break;
          }
+diff --git a/port/src/pcsched.c b/port/src/pcsched.c
+index a000748..b76b906 100644
+--- a/port/src/pcsched.c
++++ b/port/src/pcsched.c
+@@ -218,6 +218,35 @@ void *portAllocHigh(u32 size)
+         }
+     }
+ 
++#ifndef _WIN32
++    {
++        /* Console: every mmap is rounded to 64 KB pages and the title only has ~440 MB, so
++         * hundreds of small never-freed requests (model DL copies, stan packs) used the memory
++         * up and the rest of the game started failing. Bump them from 8 MB chunks instead. */
++        static u8 *chunk;
++        static u32 chunk_used;
++        const u32 CHUNK = 8u * 1024u * 1024u;
++        if (size <= 1024u * 1024u)
++        {
++            if (chunk == NULL || chunk_used + size > CHUNK)
++            {
++                void *c = portAllocHighRaw(NULL, CHUNK);
++                if (c != NULL)
++                {
++                    chunk = (u8 *) c;
++                    chunk_used = 0;
++                    portConLogf("ge: portAllocHigh: new 8 MB chunk at %p\n", c);
++                }
++            }
++            if (chunk != NULL && chunk_used + size <= CHUNK)
++            {
++                void *p = chunk + chunk_used;
++                chunk_used += size;
++                return p;
++            }
++        }
++    }
++#endif
+     for (attempt = 0; attempt < 8 && !portAllocHighSkipHints(); attempt++)
+     {
+         void *p = portAllocHighRaw((void *) (0x50000000u + 0x08000000u * (u32) attempt), size);
+@@ -371,7 +400,11 @@ unsigned long long portProfNow(void)
+ /* The game's memp arena on PC (see boss.c's PC arm). 64MB: the N64 had ~3MB
+  * here; headroom is free on host and keeps every "pool exhausted" hang path
+  * unreachable during bring-up. */
++#ifdef _WIN32
+ #define PORT_MEMP_ARENA_SIZE (64u * 1024u * 1024u)
++#else
++#define PORT_MEMP_ARENA_SIZE (40u * 1024u * 1024u) /* console: ~440 MB for everything */
++#endif
+ 
+ void *portGetMempArena(u32 *outsize)
+ {
 diff --git a/port/src/romdata.c b/port/src/romdata.c
 index 5af83d8..22e19ce 100644
 --- a/port/src/romdata.c
