@@ -1,5 +1,5 @@
 diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
-index 8900755..5e75406 100644
+index 8900755..2d1083e 100644
 --- a/port/fast3d/gfx_pc.cpp
 +++ b/port/fast3d/gfx_pc.cpp
 @@ -270,7 +270,7 @@ static struct RSP {
@@ -68,7 +68,7 @@ index 8900755..5e75406 100644
      ge_flush_origin = is_rect ? 1u : (ge_tri_origin & 15u);
      roc_stat_tri_origin[ge_flush_origin]++;
      struct LoadedVertex* v1 = &rsp.loaded_vertices[vtx1_idx];
-@@ -4740,11 +4790,35 @@ ndcprobe_done:;
+@@ -4740,11 +4790,46 @@ ndcprobe_done:;
          }
      }
  
@@ -86,8 +86,19 @@ index 8900755..5e75406 100644
 +                const float n = -be / (al + 1.0f), f = -be / (al - 1.0f);
 +                const float n2 = n * 0.25f;
 +                if (n > 0.0f && f > n && n2 < f) {
-+                    ge_dA = (f + n2) / (f - n2) - al;
-+                    ge_dB = -2.0f * f * n2 / (f - n2) - be;
++                    /* only when every vertex really lies on z = al*w + be (a draw whose
++                     * matrices differ from the loaded P - models, 2D - is left alone) */
++                    bool fits = true;
++                    for (int i = 0; i < 3; i++) {
++                        const float zz = v_arr[i]->z, ww = v_arr[i]->w;
++                        const float err = zz - (al * ww + be);
++                        const float tol = 1e-3f * (fabsf(zz) + fabsf(ww) + 1.0f);
++                        if (!(fabsf(err) <= tol)) fits = false;
++                    }
++                    if (fits) {
++                        ge_dA = (f + n2) / (f - n2) - al;
++                        ge_dB = -2.0f * f * n2 / (f - n2) - be;
++                    }
 +                }
 +            }
 +        }
@@ -104,7 +115,7 @@ index 8900755..5e75406 100644
          if (clip_parameters.z_is_from_0_to_1) {
              z = (z + w) / 2.0f;
          }
-@@ -7629,6 +7703,18 @@ static void gfx_run_dl(Gfx* cmd) {
+@@ -7629,6 +7714,18 @@ static void gfx_run_dl(Gfx* cmd) {
                      }
                      fflush(stderr);
                  }
