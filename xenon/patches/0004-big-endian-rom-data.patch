@@ -1,5 +1,5 @@
 diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
-index 8900755..49a9da6 100644
+index 8900755..d35e6de 100644
 --- a/port/fast3d/gfx_pc.cpp
 +++ b/port/fast3d/gfx_pc.cpp
 @@ -270,7 +270,7 @@ static struct RSP {
@@ -11,10 +11,72 @@ index 8900755..49a9da6 100644
  
      // PD-only vertex-color palette (G_COL): GE's stock Vtx carries RGBA
      // inline, and GE's 0x07 is G_RESERVED2 (never emitted). Dead-gated.
-@@ -3651,6 +3651,89 @@ static int gfx_ge_farclip_mode(void) {
+@@ -505,7 +505,28 @@ static struct PortHwLoad g_PortHwLoad; /* the frame in progress (gfx_api.h) */
+ /* ZMODE_DEC projection intercept + pull distance of the current decal state,
+  * for the GL backend's decal clip (gfx_opengl_draw_triangles) */
+ float gfx_ge_dec_b = 0.0f, gfx_ge_dec_d = 0.0f;
++#if defined(GE_XENON)
++/* Medicao de desempenho do 360 (xenon_perf.c): relogio da CPU (mftb, 49,875 MHz) acumulado por categoria.
++ * Categorias aninhadas/recursivas so contam na entrada mais externa. */
++extern "C" void xperf_acc_ticks(int id, uint64_t ticks);
++extern "C" void xperf_count(int id, int n);
++struct XTimer {
++    static inline uint64_t tb() { uint64_t v; __asm__ volatile("mftb %0" : "=r"(v)); return v; }
++    static int depth[16];
++    int id; uint64_t t0;
++    explicit XTimer(int i) : id(i), t0(0) { if (depth[id]++ == 0) t0 = tb(); }
++    ~XTimer() { if (--depth[id] == 0) xperf_acc_ticks(id, tb() - t0); }
++};
++int XTimer::depth[16];
++#define XPERF(id) XTimer xperf_timer_(id)
++#define XPERF_COUNT(id) xperf_count(id, 1)
++#else
++#define XPERF(id)
++#define XPERF_COUNT(id)
++#endif
++
+ static void gfx_flush(void) {
++    XPERF(6);
+     if (buf_vbo_len > 0) {
+         roc_stat_draw_origin[ge_flush_origin & 15u]++;
+         gfx_rapi->draw_triangles(buf_vbo, buf_vbo_len, buf_vbo_num_tris);
+@@ -1231,6 +1252,7 @@ static void gfx_dxlu_plane_pass(uint32_t nunits) {
+ static unsigned long long dxlu_stat_sort_us, dxlu_stat_replay_us;
+ static uint32_t dxlu_stat_frame_tris, dxlu_stat_frame_draws;
+ static void gfx_dxlu_draw(void) {
++    XPERF(10);
+     if (dxlu_num_tris == 0) {
+         return;
+     }
+@@ -2861,6 +2883,7 @@ static void ge_texchurn_report(void) {
+ }
+ 
+ static void import_texture(int i, int tile, bool importReplacement) {
++    XPERF(9);
+     LoadedTexture& loaded_texture = rdp.loaded_texture[rdp.texture_tile[tile].tmem];
+     const uint8_t fmt = rdp.texture_tile[tile].fmt;
+     const uint8_t siz = rdp.texture_tile[tile].siz;
+@@ -3269,6 +3292,7 @@ static void gfx_matrix_mul(float res[4][4], const float a[4][4], const float b[4
+ }
+ 
+ static void gfx_sp_matrix(uint8_t parameters, const int32_t* addr) {
++    XPERF(11);
+     if (roc_capturing != nullptr && roc_capturing_kind == 0) {
+         roc_capture_bad = true; /* room cache: one MP matrix per list (parts re-run their MTX in the walk) */
+         roc_capture_bad_why = "matrix load in a room list";
+@@ -3379,6 +3403,7 @@ static void gfx_adjust_width_height_for_scale(uint32_t& width, uint32_t& height)
+ }
+ 
+ static void gfx_sp_vertex(size_t n_vertices, size_t dest_index, const Vtx* vertices) {
++    XPERF(4);
+     SUPPORT_CHECK(n_vertices <= MAX_VERTICES);
+ 
+     for (size_t i = 0; i < n_vertices; i++, dest_index++) {
+@@ -3651,6 +3676,91 @@ static int gfx_ge_farclip_mode(void) {
  #include "gfx_roomcache.inl"
  
  static void gfx_sp_tri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx, bool is_rect) {
++    XPERF(5);
 +#if defined(GE_XENON)
 +    {
 +        /* The Midas GL path draws with GL_DEPTH_CLAMP: geometry nearer than the near plane is kept
@@ -33,6 +95,7 @@ index 8900755..49a9da6 100644
 +                if (a[i]->w < eps || a[i]->z + a[i]->w < 0.0f) need = true;
 +            }
 +            if (need) {
++                XPERF_COUNT(0);
 +                struct LoadedVertex pa[8], pb[8], tmp[8];
 +                int na = 3, nb = 3;
 +                for (int i = 0; i < 3; i++) { pa[i] = *a[i]; pb[i] = *a[i]; }
@@ -101,7 +164,7 @@ index 8900755..49a9da6 100644
      ge_flush_origin = is_rect ? 1u : (ge_tri_origin & 15u);
      roc_stat_tri_origin[ge_flush_origin]++;
      struct LoadedVertex* v1 = &rsp.loaded_vertices[vtx1_idx];
-@@ -4740,11 +4823,54 @@ ndcprobe_done:;
+@@ -4740,11 +4850,54 @@ ndcprobe_done:;
          }
      }
  
@@ -156,7 +219,7 @@ index 8900755..49a9da6 100644
          if (clip_parameters.z_is_from_0_to_1) {
              z = (z + w) / 2.0f;
          }
-@@ -7629,6 +7755,18 @@ static void gfx_run_dl(Gfx* cmd) {
+@@ -7629,6 +7782,18 @@ static void gfx_run_dl(Gfx* cmd) {
                      }
                      fflush(stderr);
                  }
@@ -175,6 +238,42 @@ index 8900755..49a9da6 100644
                  sysFatalError("Unknown GBI opcode 0x%02x at %p.\nw0 %08x\nw1 %08x", opcode, cmd, cmd->words.w0, cmd->words.w1);
                  break;
          }
+@@ -7816,6 +7981,7 @@ extern "C" unsigned long long g_PortGfxRunT0Us = 0; /* hitchlog.c: this frame's
+ extern "C" unsigned gfx_opengl_poll_gl_error(void); /* gfx_opengl.cpp */
+ 
+ extern "C" void gfx_run(Gfx* commands) {
++    XPERF(3);
+     const std::chrono::steady_clock::time_point ge_run_t0 = std::chrono::steady_clock::now();
+     g_PortGfxRunT0Us = portProfNow();
+     struct GeRunTimer {
+diff --git a/port/src/audio_pc.c b/port/src/audio_pc.c
+index 5a3ce97..6ea613b 100644
+--- a/port/src/audio_pc.c
++++ b/port/src/audio_pc.c
+@@ -1033,8 +1033,23 @@ static void portAudioTrim(u32 q)
+  * N64 audio thread: builds and executes as many audio frames as needed to
+  * keep the SDL queue ahead of the DAC.
+  */
++#ifdef GE_XENON
++extern void xperf_acc_ticks(int id, unsigned long long ticks);
++static void portAudioPump_inner(void);
+ void portAudioPump(void)
+ {
++    unsigned long long t0, t1;
++    __asm__ volatile("mftb %0" : "=r"(t0));
++    portAudioPump_inner();
++    __asm__ volatile("mftb %0" : "=r"(t1));
++    xperf_acc_ticks(7, t1 - t0);
++}
++static void portAudioPump_inner(void)
++{
++#else
++void portAudioPump(void)
++{
++#endif
+     /* audi.c's RSP budget is MAX_ACMD_SIZE = 3000 Acmds per frame; a
+      * music-dense frame really emits >1024 (the undersized first cut
+      * overflowed into frameBuf - the stable float-bits-as-pointer
 diff --git a/port/src/pcsched.c b/port/src/pcsched.c
 index a000748..772be61 100644
 --- a/port/src/pcsched.c

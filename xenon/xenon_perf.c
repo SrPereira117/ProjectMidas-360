@@ -25,7 +25,15 @@ static double g_sum_ms, g_max_ms, g_sum_render_ms;
 static uint64_t g_pd, g_pt, g_pu, g_ps;
 static uint32_t g_pund;
 static uint32_t g_rows;
-static double g_acc[4];
+#define NACC 16
+static double g_acc[NACC];        /* ms acumulados no segundo */
+static double g_frm[NACC];        /* ms acumulados no quadro atual (para o log de picos) */
+static uint32_t g_cnt[4];         /* contadores do segundo (0 = triangulos cortados no plano proximo) */
+static uint32_t g_frm_cnt[4];
+static double g_tb_hz = 49875000.0;   /* relogio mftb do Xenon; recalibrado a cada segundo */
+static uint64_t g_tb_prev;
+static double g_tb_prev_s;
+static uint64_t tb_now(void) { uint64_t v; __asm__ volatile("mftb %0" : "=r"(v)); return v; }
 
 static double now_s(void)
 {
@@ -87,7 +95,8 @@ void xperf_init(void)
     }
     put("# midas_perf.csv: uma linha por segundo\n");
     put("t_s,quadros,fps,ms_medio,ms_max,ms_render_medio,desenhos,triangulos,texturas_novas,shaders_novos,"
-        "audio_underruns,flush_pendrive_ms,ms_submit,ms_present,ms_textura\n");
+        "audio_underruns,flush_pendrive_ms,ms_submit,ms_present,ms_textura,"
+        "ms_fast3d,ms_vertices,ms_triangulos,ms_flush_draw,ms_audio,ms_import_tex,ms_sorter_xlu,ms_matriz,tris_cortados_perto\n");
     xperf_flush();
 }
 
@@ -152,14 +161,21 @@ void xperf_frame_end(uint64_t draws, uint64_t tris, uint64_t uploads, uint64_t s
         const double span = t - g_sec_start;
         const uint32_t und = xenon_audio_underruns();
         if (g_n > 0) {
-            put("%.0f,%u,%.1f,%.2f,%.1f,%.2f,%llu,%llu,%llu,%llu,%u,%.0f,%.2f,%.2f,%.2f\n", t - g_t0, g_n, (double)g_n / span,
+            put("%.0f,%u,%.1f,%.2f,%.1f,%.2f,%llu,%llu,%llu,%llu,%u,%.0f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%u\n", t - g_t0, g_n, (double)g_n / span,
                 g_sum_ms / g_n, g_max_ms, g_sum_render_ms / g_n, (unsigned long long)(draws - g_pd),
                 (unsigned long long)(tris - g_pt), (unsigned long long)(uploads - g_pu),
                 (unsigned long long)(shaders - g_ps), und - g_pund, g_flush_ms, g_acc[0] / g_n, g_acc[1] / g_n,
-                g_acc[2] / g_n);
-            g_acc[0] = g_acc[1] = g_acc[2] = g_acc[3] = 0.0;
+                g_acc[2] / g_n, g_acc[3] / g_n, g_acc[4] / g_n, g_acc[5] / g_n, g_acc[6] / g_n, g_acc[7] / g_n,
+                g_acc[9] / g_n, g_acc[10] / g_n, g_acc[11] / g_n, g_cnt[0]);
+            for (int i = 0; i < NACC; i++) g_acc[i] = 0.0;
+            for (int i = 0; i < 4; i++) g_cnt[i] = 0;
             g_flush_ms = 0.0;
             g_rows++;
+        }
+        {   /* recalibra o relogio da CPU */
+            const uint64_t tb = tb_now();
+            if (g_tb_prev && span > 0.5) g_tb_hz = (double)(tb - g_tb_prev) / (t - g_tb_prev_s);
+            g_tb_prev = tb; g_tb_prev_s = t;
         }
         g_pd = draws; g_pt = tris; g_pu = uploads; g_ps = shaders; g_pund = und;
         g_n = 0; g_sum_ms = g_max_ms = g_sum_render_ms = 0.0;
@@ -170,8 +186,27 @@ void xperf_frame_end(uint64_t draws, uint64_t tris, uint64_t uploads, uint64_t s
 
 void xperf_acc(int id, double ms)
 {
-    if (id >= 0 && id < 4) g_acc[id] += ms;
+    if (id >= 0 && id < NACC) { g_acc[id] += ms; g_frm[id] += ms; }
 }
+
+void xperf_acc_ticks(int id, uint64_t ticks)
+{
+    xperf_acc(id, (double)ticks * 1000.0 / g_tb_hz);
+}
+
+void xperf_count(int id, int n)
+{
+    if (id >= 0 && id < 4) { g_cnt[id] += (uint32_t)n; g_frm_cnt[id] += (uint32_t)n; }
+}
+
+void xperf_frame_reset(void)
+{
+    for (int i = 0; i < NACC; i++) g_frm[i] = 0.0;
+    for (int i = 0; i < 4; i++) g_frm_cnt[i] = 0;
+}
+
+double xperf_frame_ms(int id) { return (id >= 0 && id < NACC) ? g_frm[id] : 0.0; }
+uint32_t xperf_frame_count(int id) { return (id >= 0 && id < 4) ? g_frm_cnt[id] : 0; }
 
 double xperf_now_ms(void)
 {

@@ -773,13 +773,17 @@ void r_end_frame()
             if (ms > 45.0 && said < 400) {
                 said++;
                 xsdk_log_write("xenon: video: pico %.0f ms no quadro %llu (%llu desenhos, %llu triangulos, %llu texturas novas, "
-                               "%llu shaders compilados)",
+                               "%llu shaders compilados) [fast3d %.0f, vert %.0f, tri %.0f, flush %.0f, texconv %.0f, xlu %.0f, "
+                               "audio %.0f, upload %.0f ms]",
                                ms, (unsigned long long) g_frames, (unsigned long long) (g_draws - pd),
                                (unsigned long long) (g_tris - pt), (unsigned long long) (g_uploads - pu),
-                               (unsigned long long) (g_shaders_compiled - ps));
+                               (unsigned long long) (g_shaders_compiled - ps), xperf_frame_ms(3), xperf_frame_ms(4),
+                               xperf_frame_ms(5), xperf_frame_ms(6), xperf_frame_ms(9), xperf_frame_ms(10),
+                               xperf_frame_ms(7), xperf_frame_ms(2));
             }
         }
         last = now;
+        xperf_frame_reset();
         pd = g_draws; pt = g_tris; pu = g_uploads; ps = g_shaders_compiled;
         if ((g_frames % 300) == 0) {
             xsdk_log_write("xenon: video: pior quadro dos ultimos 300: %.0f ms", worst);

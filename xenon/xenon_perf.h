@@ -19,6 +19,13 @@ void xlog_async_sync(void);
 /* tempo acumulado por categoria (0 submit, 1 present, 2 textura, 3 conversao de DL) em ms */
 void xperf_acc(int id, double ms);
 double xperf_now_ms(void);
+void xperf_acc_ticks(int id, uint64_t ticks);   /* ticks do mftb */
+void xperf_count(int id, int n);
+void xperf_frame_reset(void);                   /* zera o acumulado do quadro (depois do log de pico) */
+double xperf_frame_ms(int id);                  /* acumulado no quadro atual */
+uint32_t xperf_frame_count(int id);
+/* ids: 0 submit, 1 present, 2 upload textura, 3 gfx_run (Fast3D todo), 4 vertices, 5 triangulos (inclui flush
+ * que ele dispara), 6 flush/draw, 7 audio (portAudioPump), 9 import_texture, 10 sorter XLU, 11 matriz */
 uint32_t xenon_audio_underruns(void);
 #ifdef __cplusplus
 }
