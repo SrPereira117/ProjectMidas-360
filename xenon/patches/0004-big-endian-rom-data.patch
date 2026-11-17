@@ -1,5 +1,5 @@
 diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
-index 8900755..89209c6 100644
+index 8900755..49a9da6 100644
 --- a/port/fast3d/gfx_pc.cpp
 +++ b/port/fast3d/gfx_pc.cpp
 @@ -270,7 +270,7 @@ static struct RSP {
@@ -7,59 +7,92 @@ index 8900755..89209c6 100644
      } texture_scaling_factor;
  
 -    struct LoadedVertex loaded_vertices[MAX_VERTICES + 4];
-+    struct LoadedVertex loaded_vertices[MAX_VERTICES + 8]; /* +4..+7: near-plane clip temporaries */
++    struct LoadedVertex loaded_vertices[MAX_VERTICES + 16]; /* +4..+7: near-plane clip temporaries */
  
      // PD-only vertex-color palette (G_COL): GE's stock Vtx carries RGBA
      // inline, and GE's 0x07 is G_RESERVED2 (never emitted). Dead-gated.
-@@ -3651,6 +3651,56 @@ static int gfx_ge_farclip_mode(void) {
+@@ -3651,6 +3651,89 @@ static int gfx_ge_farclip_mode(void) {
  #include "gfx_roomcache.inl"
  
  static void gfx_sp_tri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx, bool is_rect) {
 +#if defined(GE_XENON)
 +    {
-+        /* The Midas GL path draws with GL_DEPTH_CLAMP: nothing is cut at the near plane, only
-+         * at w <= 0. The Xenos cannot clip one plane alone, so cut the triangle at w = eps here
-+         * (the vertex shader clamps z), else geometry right in front of the eye is lost. */
++        /* The Midas GL path draws with GL_DEPTH_CLAMP: geometry nearer than the near plane is kept
++         * and gets depth 0 per PIXEL. The Xenos cannot do that (one clip plane alone, and a
++         * per-vertex clamp smears across a big polygon and hides models in front of it), so cut
++         * the triangle on the CPU at the near plane z = -w: the inside part keeps its exact depth,
++         * the outside part is drawn with every vertex at depth 0 (z = -w, a flat plane), and both
++         * are cut at w = eps so nothing is projected from behind the eye. */
 +        static bool in_nearclip = false;
-+        const float eps = 2.0f;
++        const float eps = 1.0f;
 +        if (!is_rect && !in_nearclip && roc_capturing == nullptr) {
-+            struct LoadedVertex* a[3] = { &rsp.loaded_vertices[vtx1_idx], &rsp.loaded_vertices[vtx2_idx],
-+                                          &rsp.loaded_vertices[vtx3_idx] };
-+            int nin = 0;
-+            for (int i = 0; i < 3; i++) if (a[i]->w >= eps) nin++;
-+            if (nin > 0 && nin < 3) {
-+                struct LoadedVertex out[4];
-+                int n = 0;
-+                for (int i = 0; i < 3; i++) {
-+                    const struct LoadedVertex* p0 = a[i];
-+                    const struct LoadedVertex* p1 = a[(i + 1) % 3];
-+                    const bool in0 = p0->w >= eps, in1 = p1->w >= eps;
-+                    if (in0) out[n++] = *p0;
-+                    if (in0 != in1) {
-+                        const float t = (eps - p0->w) / (p1->w - p0->w);
-+                        struct LoadedVertex nv = *p0;
-+                        nv.x = p0->x + t * (p1->x - p0->x);
-+                        nv.y = p0->y + t * (p1->y - p0->y);
-+                        nv.z = p0->z + t * (p1->z - p0->z);
-+                        nv.w = eps;
-+                        nv.u = p0->u + t * (p1->u - p0->u);
-+                        nv.v = p0->v + t * (p1->v - p0->v);
-+                        nv.color.r = (uint8_t) (p0->color.r + t * ((float) p1->color.r - p0->color.r) + 0.5f);
-+                        nv.color.g = (uint8_t) (p0->color.g + t * ((float) p1->color.g - p0->color.g) + 0.5f);
-+                        nv.color.b = (uint8_t) (p0->color.b + t * ((float) p1->color.b - p0->color.b) + 0.5f);
-+                        nv.color.a = (uint8_t) (p0->color.a + t * ((float) p1->color.a - p0->color.a) + 0.5f);
-+                        nv.fog = (uint8_t) (p0->fog + t * ((float) p1->fog - p0->fog) + 0.5f);
-+                        nv.clip_rej = 0;
-+                        out[n++] = nv;
++            const struct LoadedVertex* a[3] = { &rsp.loaded_vertices[vtx1_idx], &rsp.loaded_vertices[vtx2_idx],
++                                                &rsp.loaded_vertices[vtx3_idx] };
++            bool need = false;
++            for (int i = 0; i < 3; i++) {
++                if (a[i]->w < eps || a[i]->z + a[i]->w < 0.0f) need = true;
++            }
++            if (need) {
++                struct LoadedVertex pa[8], pb[8], tmp[8];
++                int na = 3, nb = 3;
++                for (int i = 0; i < 3; i++) { pa[i] = *a[i]; pb[i] = *a[i]; }
++
++                /* f(v) >= 0 is "inside"; sgn flips which side is kept */
++                struct Clip {
++                    static float dist(const struct LoadedVertex& v, int plane, float sgn, float e) {
++                        return plane == 0 ? sgn * (v.z + v.w) : v.w - e;
++                    }
++                    static int run(struct LoadedVertex* poly, int n, struct LoadedVertex* tmp, int plane, float sgn,
++                                   float e) {
++                        int m = 0;
++                        for (int i = 0; i < n; i++) {
++                            const struct LoadedVertex& p0 = poly[i];
++                            const struct LoadedVertex& p1 = poly[(i + 1) % n];
++                            const float d0 = dist(p0, plane, sgn, e), d1 = dist(p1, plane, sgn, e);
++                            const bool in0 = d0 >= 0.0f, in1 = d1 >= 0.0f;
++                            if (in0 && m < 8) tmp[m++] = p0;
++                            if (in0 != in1 && m < 8) {
++                                const float t = d0 / (d0 - d1);
++                                struct LoadedVertex nv = p0;
++                                nv.x = p0.x + t * (p1.x - p0.x);
++                                nv.y = p0.y + t * (p1.y - p0.y);
++                                nv.z = p0.z + t * (p1.z - p0.z);
++                                nv.w = p0.w + t * (p1.w - p0.w);
++                                nv.u = p0.u + t * (p1.u - p0.u);
++                                nv.v = p0.v + t * (p1.v - p0.v);
++                                nv.color.r = (uint8_t) (p0.color.r + t * ((float) p1.color.r - p0.color.r) + 0.5f);
++                                nv.color.g = (uint8_t) (p0.color.g + t * ((float) p1.color.g - p0.color.g) + 0.5f);
++                                nv.color.b = (uint8_t) (p0.color.b + t * ((float) p1.color.b - p0.color.b) + 0.5f);
++                                nv.color.a = (uint8_t) (p0.color.a + t * ((float) p1.color.a - p0.color.a) + 0.5f);
++                                nv.fog = (uint8_t) (p0.fog + t * ((float) p1.fog - p0.fog) + 0.5f);
++                                nv.clip_rej = 0;
++                                tmp[m++] = nv;
++                            }
++                        }
++                        for (int i = 0; i < m; i++) poly[i] = tmp[i];
++                        return m;
++                    }
++                };
++
++                /* inside part: z >= -w and w >= eps */
++                na = Clip::run(pa, na, tmp, 0, 1.0f, eps);
++                if (na >= 3) na = Clip::run(pa, na, tmp, 1, 1.0f, eps);
++                /* outside part: z <= -w, w >= eps, flattened onto depth 0 */
++                nb = Clip::run(pb, nb, tmp, 0, -1.0f, eps);
++                if (nb >= 3) nb = Clip::run(pb, nb, tmp, 1, 1.0f, eps);
++                for (int i = 0; i < nb; i++) pb[i].z = -pb[i].w;
++
++                in_nearclip = true;
++                for (int part = 0; part < 2; part++) {
++                    struct LoadedVertex* poly = part == 0 ? pa : pb;
++                    const int n = part == 0 ? na : nb;
++                    if (n < 3) continue;
++                    for (int i = 0; i < n; i++) rsp.loaded_vertices[MAX_VERTICES + 4 + i] = poly[i];
++                    for (int i = 1; i + 1 < n; i++) {
++                        gfx_sp_tri1(MAX_VERTICES + 4, MAX_VERTICES + 4 + i, MAX_VERTICES + 5 + i, false);
 +                    }
 +                }
-+                if (n >= 3) {
-+                    for (int i = 0; i < n; i++) rsp.loaded_vertices[MAX_VERTICES + 4 + i] = out[i];
-+                    in_nearclip = true;
-+                    gfx_sp_tri1(MAX_VERTICES + 4, MAX_VERTICES + 5, MAX_VERTICES + 6, false);
-+                    if (n == 4) gfx_sp_tri1(MAX_VERTICES + 4, MAX_VERTICES + 6, MAX_VERTICES + 7, false);
-+                    in_nearclip = false;
-+                }
++                in_nearclip = false;
 +                return;
 +            }
 +        }
@@ -68,7 +101,7 @@ index 8900755..89209c6 100644
      ge_flush_origin = is_rect ? 1u : (ge_tri_origin & 15u);
      roc_stat_tri_origin[ge_flush_origin]++;
      struct LoadedVertex* v1 = &rsp.loaded_vertices[vtx1_idx];
-@@ -4740,11 +4790,54 @@ ndcprobe_done:;
+@@ -4740,11 +4823,54 @@ ndcprobe_done:;
          }
      }
  
@@ -123,7 +156,7 @@ index 8900755..89209c6 100644
          if (clip_parameters.z_is_from_0_to_1) {
              z = (z + w) / 2.0f;
          }
-@@ -7629,6 +7722,18 @@ static void gfx_run_dl(Gfx* cmd) {
+@@ -7629,6 +7755,18 @@ static void gfx_run_dl(Gfx* cmd) {
                      }
                      fflush(stderr);
                  }
@@ -143,7 +176,7 @@ index 8900755..89209c6 100644
                  break;
          }
 diff --git a/port/src/pcsched.c b/port/src/pcsched.c
-index a000748..b76b906 100644
+index a000748..772be61 100644
 --- a/port/src/pcsched.c
 +++ b/port/src/pcsched.c
 @@ -218,6 +218,35 @@ void *portAllocHigh(u32 size)
@@ -194,6 +227,15 @@ index a000748..b76b906 100644
  
  void *portGetMempArena(u32 *outsize)
  {
+@@ -908,7 +941,7 @@ pace_done:
+     }
+ 
+     /* Visible progress heartbeat: once a second on the console. */
+-    if ((g_PortFramesPumped % 60u) == 0u)
++    if ((g_PortFramesPumped % 3600u) == 0u) /* console: a flush per second hit the USB stick */
+     {
+         printf("ge: frame %u | gfx tasks submitted %u\n",
+                g_PortFramesPumped, g_PortGfxTasksSubmitted);
 diff --git a/port/src/romdata.c b/port/src/romdata.c
 index 5af83d8..22e19ce 100644
 --- a/port/src/romdata.c
