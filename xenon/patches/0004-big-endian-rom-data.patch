@@ -1,5 +1,5 @@
 diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
-index 8900755..d35e6de 100644
+index 8900755..2f77332 100644
 --- a/port/fast3d/gfx_pc.cpp
 +++ b/port/fast3d/gfx_pc.cpp
 @@ -270,7 +270,7 @@ static struct RSP {
@@ -72,7 +72,7 @@ index 8900755..d35e6de 100644
      SUPPORT_CHECK(n_vertices <= MAX_VERTICES);
  
      for (size_t i = 0; i < n_vertices; i++, dest_index++) {
-@@ -3651,6 +3676,91 @@ static int gfx_ge_farclip_mode(void) {
+@@ -3651,6 +3676,95 @@ static int gfx_ge_farclip_mode(void) {
  #include "gfx_roomcache.inl"
  
  static void gfx_sp_tri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx, bool is_rect) {
@@ -94,6 +94,10 @@ index 8900755..d35e6de 100644
 +            for (int i = 0; i < 3; i++) {
 +                if (a[i]->w < eps || a[i]->z + a[i]->w < 0.0f) need = true;
 +            }
++            /* triangulo todo fora do volume em x/y (mesmo lado): o caminho normal ja o descarta, sem recortar */
++            if (need && ((a[0]->clip_rej & a[1]->clip_rej & a[2]->clip_rej) & 15u) != 0) need = false;
++            /* triangulo todo atras do olho: o recorte nao deixaria nada */
++            if (need && a[0]->w < eps && a[1]->w < eps && a[2]->w < eps) return;
 +            if (need) {
 +                XPERF_COUNT(0);
 +                struct LoadedVertex pa[8], pb[8], tmp[8];
@@ -164,7 +168,7 @@ index 8900755..d35e6de 100644
      ge_flush_origin = is_rect ? 1u : (ge_tri_origin & 15u);
      roc_stat_tri_origin[ge_flush_origin]++;
      struct LoadedVertex* v1 = &rsp.loaded_vertices[vtx1_idx];
-@@ -4740,11 +4850,54 @@ ndcprobe_done:;
+@@ -4740,19 +4854,65 @@ ndcprobe_done:;
          }
      }
  
@@ -208,6 +212,9 @@ index 8900755..d35e6de 100644
 +        }
 +    }
 +#endif
++    /* indice local: buf_vbo_len e global e, com -fno-strict-aliasing, o compilador o recarregaria e regravaria
++     * a cada float escrito (load-hit-store no PPC em ordem). */
++    size_t vl = buf_vbo_len;
      for (int i = 0; i < 3; i++) {
          float z = v_arr[i]->z, w = v_arr[i]->w;
          if (dec_pull && w > 4.0f * ge_dec_pull) {
@@ -219,7 +226,98 @@ index 8900755..d35e6de 100644
          if (clip_parameters.z_is_from_0_to_1) {
              z = (z + w) / 2.0f;
          }
-@@ -7629,6 +7782,18 @@ static void gfx_run_dl(Gfx* cmd) {
+ 
+-        buf_vbo[buf_vbo_len++] = v_arr[i]->x;
+-        buf_vbo[buf_vbo_len++] = clip_parameters.invert_y ? -v_arr[i]->y : v_arr[i]->y;
+-        buf_vbo[buf_vbo_len++] = z;
+-        buf_vbo[buf_vbo_len++] = w;
++        buf_vbo[vl++] = v_arr[i]->x;
++        buf_vbo[vl++] = clip_parameters.invert_y ? -v_arr[i]->y : v_arr[i]->y;
++        buf_vbo[vl++] = z;
++        buf_vbo[vl++] = w;
+ 
+         for (int t = 0; t < 2; t++) {
+             if (!used_textures[t]) {
+@@ -4769,39 +4929,39 @@ ndcprobe_done:;
+                 u = (v_arr[i]->u * tc_su[t] - tc_bu[t]) * tc_p[t] + tc_c[t];
+                 v = (v_arr[i]->v * tc_sv[t] - tc_bv[t]) * tc_p[t] + tc_c[t];
+             }
+-            buf_vbo[buf_vbo_len++] = u * tc_iw[t];
+-            buf_vbo[buf_vbo_len++] = v * tc_ih[t];
++            buf_vbo[vl++] = u * tc_iw[t];
++            buf_vbo[vl++] = v * tc_ih[t];
+             if (tc_clamps[t]) {
+-                buf_vbo[buf_vbo_len++] = tc_cs[t];
++                buf_vbo[vl++] = tc_cs[t];
+             }
+             if (tc_clampt[t]) {
+-                buf_vbo[buf_vbo_len++] = tc_ct[t];
++                buf_vbo[vl++] = tc_ct[t];
+             }
+         }
+ 
+         if (use_fog) {
+-            if (i == 0) roc_fog_ofs = (int)(buf_vbo_len - roc_vstart);
+-            buf_vbo[buf_vbo_len++] = fog_rgb[0];
+-            buf_vbo[buf_vbo_len++] = fog_rgb[1];
+-            buf_vbo[buf_vbo_len++] = fog_rgb[2];
+-            buf_vbo[buf_vbo_len++] = ge_b2f[v_arr[i]->fog]; // fog factor
++            if (i == 0) roc_fog_ofs = (int)(vl - roc_vstart);
++            buf_vbo[vl++] = fog_rgb[0];
++            buf_vbo[vl++] = fog_rgb[1];
++            buf_vbo[vl++] = fog_rgb[2];
++            buf_vbo[vl++] = ge_b2f[v_arr[i]->fog]; // fog factor
+         }
+ 
+         if (use_pixfog) {
+-            if (i == 0) roc_pixfog_ofs = (int)(buf_vbo_len - roc_vstart);
+-            buf_vbo[buf_vbo_len++] = pixfog_mul;
+-            buf_vbo[buf_vbo_len++] = pixfog_ofs;
++            if (i == 0) roc_pixfog_ofs = (int)(vl - roc_vstart);
++            buf_vbo[vl++] = pixfog_mul;
++            buf_vbo[vl++] = pixfog_ofs;
+         }
+ 
+         if (ge_sky_pixdiv_active) {
+-            buf_vbo[buf_vbo_len++] = ge_sky_q[i];
++            buf_vbo[vl++] = ge_sky_q[i];
+         }
+ 
+         if (use_grayscale) {
+-            buf_vbo[buf_vbo_len++] = gray[0];
+-            buf_vbo[buf_vbo_len++] = gray[1];
+-            buf_vbo[buf_vbo_len++] = gray[2];
+-            buf_vbo[buf_vbo_len++] = gray[3];
++            buf_vbo[vl++] = gray[0];
++            buf_vbo[vl++] = gray[1];
++            buf_vbo[vl++] = gray[2];
++            buf_vbo[vl++] = gray[3];
+         }
+ 
+         for (int j = 0; j < num_inputs; j++) {
+@@ -4845,16 +5005,17 @@ ndcprobe_done:;
+                         break;
+                 }
+                 if (k == 0) {
+-                    buf_vbo[buf_vbo_len++] = ge_b2f[color->r];
+-                    buf_vbo[buf_vbo_len++] = ge_b2f[color->g];
+-                    buf_vbo[buf_vbo_len++] = ge_b2f[color->b];
++                    buf_vbo[vl++] = ge_b2f[color->r];
++                    buf_vbo[vl++] = ge_b2f[color->g];
++                    buf_vbo[vl++] = ge_b2f[color->b];
+                 } else {
+-                    buf_vbo[buf_vbo_len++] = ge_b2f[color->a];
++                    buf_vbo[vl++] = ge_b2f[color->a];
+                 }
+             }
+         }
+     }
+ 
++    buf_vbo_len = vl;
+     if (roc_capturing != nullptr && !roc_capture_bad) {
+         if (is_rect) {
+             roc_capture_bad = true;
+@@ -7629,6 +7790,18 @@ static void gfx_run_dl(Gfx* cmd) {
                      }
                      fflush(stderr);
                  }
@@ -238,7 +336,7 @@ index 8900755..d35e6de 100644
                  sysFatalError("Unknown GBI opcode 0x%02x at %p.\nw0 %08x\nw1 %08x", opcode, cmd, cmd->words.w0, cmd->words.w1);
                  break;
          }
-@@ -7816,6 +7981,7 @@ extern "C" unsigned long long g_PortGfxRunT0Us = 0; /* hitchlog.c: this frame's
+@@ -7816,6 +7989,7 @@ extern "C" unsigned long long g_PortGfxRunT0Us = 0; /* hitchlog.c: this frame's
  extern "C" unsigned gfx_opengl_poll_gl_error(void); /* gfx_opengl.cpp */
  
  extern "C" void gfx_run(Gfx* commands) {
