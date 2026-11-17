@@ -21,6 +21,7 @@ static double g_sum_ms, g_max_ms, g_sum_render_ms;
 static uint64_t g_pd, g_pt, g_pu, g_ps;
 static uint32_t g_pund;
 static uint32_t g_rows;
+static double g_acc[4];
 
 static double now_s(void)
 {
@@ -63,7 +64,7 @@ void xperf_init(void)
     }
     put("# midas_perf.csv: uma linha por segundo\n");
     put("t_s,quadros,fps,ms_medio,ms_max,ms_render_medio,desenhos,triangulos,texturas_novas,shaders_novos,"
-        "audio_underruns,flush_pendrive_ms\n");
+        "audio_underruns,flush_pendrive_ms,ms_submit,ms_present,ms_textura\n");
     xperf_flush();
 }
 
@@ -128,10 +129,12 @@ void xperf_frame_end(uint64_t draws, uint64_t tris, uint64_t uploads, uint64_t s
         const double span = t - g_sec_start;
         const uint32_t und = xenon_audio_underruns();
         if (g_n > 0) {
-            put("%.0f,%u,%.1f,%.2f,%.1f,%.2f,%llu,%llu,%llu,%llu,%u,%.0f\n", t - g_t0, g_n, (double)g_n / span,
+            put("%.0f,%u,%.1f,%.2f,%.1f,%.2f,%llu,%llu,%llu,%llu,%u,%.0f,%.2f,%.2f,%.2f\n", t - g_t0, g_n, (double)g_n / span,
                 g_sum_ms / g_n, g_max_ms, g_sum_render_ms / g_n, (unsigned long long)(draws - g_pd),
                 (unsigned long long)(tris - g_pt), (unsigned long long)(uploads - g_pu),
-                (unsigned long long)(shaders - g_ps), und - g_pund, g_flush_ms);
+                (unsigned long long)(shaders - g_ps), und - g_pund, g_flush_ms, g_acc[0] / g_n, g_acc[1] / g_n,
+                g_acc[2] / g_n);
+            g_acc[0] = g_acc[1] = g_acc[2] = g_acc[3] = 0.0;
             g_flush_ms = 0.0;
             g_rows++;
         }
@@ -140,4 +143,14 @@ void xperf_frame_end(uint64_t draws, uint64_t tris, uint64_t uploads, uint64_t s
         g_sec_start = t;
     }
     if (t - g_last_flush >= FLUSH_EVERY_S) xperf_flush();
+}
+
+void xperf_acc(int id, double ms)
+{
+    if (id >= 0 && id < 4) g_acc[id] += ms;
+}
+
+double xperf_now_ms(void)
+{
+    return now_s() * 1000.0;
 }

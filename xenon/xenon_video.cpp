@@ -559,8 +559,16 @@ void r_select_texture(int tile, uint32_t id, bool linear)
     if (id != 0 && id < g_textures.size()) g_textures[id].threePoint = linear;
 }
 
+struct PerfScope {
+    int id;
+    double t0;
+    explicit PerfScope(int i) : id(i), t0(xperf_now_ms()) {}
+    ~PerfScope() { xperf_acc(id, xperf_now_ms() - t0); }
+};
+
 void r_upload_texture(const uint8_t *rgba, uint32_t w, uint32_t h)
 {
+    PerfScope perf_scope(2);
     g_uploads++;
     const uint32_t id = g_cur_tex[g_cur_tile];
     if (!g_ready || id == 0 || id >= g_textures.size() || w == 0 || h == 0) return;
@@ -627,6 +635,7 @@ void r_set_use_alpha(bool use_alpha, bool modulate)
 
 void r_draw_triangles(float *buf, size_t len, size_t num_tris)
 {
+    PerfScope perf_scope(0);
     g_draws++;
     g_tris += num_tris;
     const ShaderProgram *prg = g_shader;
@@ -969,6 +978,7 @@ bool w_start_frame() { return true; }
 
 void w_swap_buffers_begin()
 {
+    PerfScope perf_scope(1);
     g_presented = false;
     if (!g_presenting || !g_ready) return;
     uint32_t address;

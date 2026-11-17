@@ -12,6 +12,9 @@ void xperf_note_rom_read(uint32_t bytes, double ms);      /* tempo real da leitu
 void xperf_frame_begin(void);
 void xperf_frame_end(uint64_t draws, uint64_t tris, uint64_t uploads, uint64_t shaders);
 void xperf_flush(void);
+/* tempo acumulado por categoria (0 submit, 1 present, 2 textura, 3 conversao de DL) em ms */
+void xperf_acc(int id, double ms);
+double xperf_now_ms(void);
 uint32_t xenon_audio_underruns(void);
 #ifdef __cplusplus
 }
