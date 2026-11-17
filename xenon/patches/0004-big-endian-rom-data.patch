@@ -1,5 +1,5 @@
 diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
-index 8900755..2f77332 100644
+index 8900755..8499a1f 100644
 --- a/port/fast3d/gfx_pc.cpp
 +++ b/port/fast3d/gfx_pc.cpp
 @@ -270,7 +270,7 @@ static struct RSP {
@@ -11,7 +11,7 @@ index 8900755..2f77332 100644
  
      // PD-only vertex-color palette (G_COL): GE's stock Vtx carries RGBA
      // inline, and GE's 0x07 is G_RESERVED2 (never emitted). Dead-gated.
-@@ -505,7 +505,28 @@ static struct PortHwLoad g_PortHwLoad; /* the frame in progress (gfx_api.h) */
+@@ -505,7 +505,35 @@ static struct PortHwLoad g_PortHwLoad; /* the frame in progress (gfx_api.h) */
  /* ZMODE_DEC projection intercept + pull distance of the current decal state,
   * for the GL backend's decal clip (gfx_opengl_draw_triangles) */
  float gfx_ge_dec_b = 0.0f, gfx_ge_dec_d = 0.0f;
@@ -20,19 +20,26 @@ index 8900755..2f77332 100644
 + * Categorias aninhadas/recursivas so contam na entrada mais externa. */
 +extern "C" void xperf_acc_ticks(int id, uint64_t ticks);
 +extern "C" void xperf_count(int id, int n);
++extern "C" volatile int ge_prof_sec;
 +struct XTimer {
 +    static inline uint64_t tb() { uint64_t v; __asm__ volatile("mftb %0" : "=r"(v)); return v; }
 +    static int depth[16];
-+    int id; uint64_t t0;
-+    explicit XTimer(int i) : id(i), t0(0) { if (depth[id]++ == 0) t0 = tb(); }
-+    ~XTimer() { if (--depth[id] == 0) xperf_acc_ticks(id, tb() - t0); }
++    int id; uint64_t t0; int prev;
++    explicit XTimer(int i) : id(i), t0(0), prev(ge_prof_sec) {
++        if (depth[id]++ == 0) t0 = tb();
++        static const int secof[16] = { 0, 0, 0, 23, 20, 1, 21, 0, 0, 22, 24, 25, 0, 0, 0, 0 };
++        if (secof[id]) ge_prof_sec = secof[id];
++    }
++    ~XTimer() { if (--depth[id] == 0) xperf_acc_ticks(id, tb() - t0); ge_prof_sec = prev; }
 +};
 +int XTimer::depth[16];
++#define PSEC(n) (ge_prof_sec = (n))
 +#define XPERF(id) XTimer xperf_timer_(id)
 +#define XPERF_COUNT(id) xperf_count(id, 1)
 +#else
 +#define XPERF(id)
 +#define XPERF_COUNT(id)
++#define PSEC(n)
 +#endif
 +
  static void gfx_flush(void) {
@@ -40,7 +47,7 @@ index 8900755..2f77332 100644
      if (buf_vbo_len > 0) {
          roc_stat_draw_origin[ge_flush_origin & 15u]++;
          gfx_rapi->draw_triangles(buf_vbo, buf_vbo_len, buf_vbo_num_tris);
-@@ -1231,6 +1252,7 @@ static void gfx_dxlu_plane_pass(uint32_t nunits) {
+@@ -1231,6 +1259,7 @@ static void gfx_dxlu_plane_pass(uint32_t nunits) {
  static unsigned long long dxlu_stat_sort_us, dxlu_stat_replay_us;
  static uint32_t dxlu_stat_frame_tris, dxlu_stat_frame_draws;
  static void gfx_dxlu_draw(void) {
@@ -48,7 +55,7 @@ index 8900755..2f77332 100644
      if (dxlu_num_tris == 0) {
          return;
      }
-@@ -2861,6 +2883,7 @@ static void ge_texchurn_report(void) {
+@@ -2861,6 +2890,7 @@ static void ge_texchurn_report(void) {
  }
  
  static void import_texture(int i, int tile, bool importReplacement) {
@@ -56,7 +63,7 @@ index 8900755..2f77332 100644
      LoadedTexture& loaded_texture = rdp.loaded_texture[rdp.texture_tile[tile].tmem];
      const uint8_t fmt = rdp.texture_tile[tile].fmt;
      const uint8_t siz = rdp.texture_tile[tile].siz;
-@@ -3269,6 +3292,7 @@ static void gfx_matrix_mul(float res[4][4], const float a[4][4], const float b[4
+@@ -3269,6 +3299,7 @@ static void gfx_matrix_mul(float res[4][4], const float a[4][4], const float b[4
  }
  
  static void gfx_sp_matrix(uint8_t parameters, const int32_t* addr) {
@@ -64,7 +71,7 @@ index 8900755..2f77332 100644
      if (roc_capturing != nullptr && roc_capturing_kind == 0) {
          roc_capture_bad = true; /* room cache: one MP matrix per list (parts re-run their MTX in the walk) */
          roc_capture_bad_why = "matrix load in a room list";
-@@ -3379,6 +3403,7 @@ static void gfx_adjust_width_height_for_scale(uint32_t& width, uint32_t& height)
+@@ -3379,6 +3410,7 @@ static void gfx_adjust_width_height_for_scale(uint32_t& width, uint32_t& height)
  }
  
  static void gfx_sp_vertex(size_t n_vertices, size_t dest_index, const Vtx* vertices) {
@@ -72,7 +79,7 @@ index 8900755..2f77332 100644
      SUPPORT_CHECK(n_vertices <= MAX_VERTICES);
  
      for (size_t i = 0; i < n_vertices; i++, dest_index++) {
-@@ -3651,6 +3676,95 @@ static int gfx_ge_farclip_mode(void) {
+@@ -3651,6 +3683,96 @@ static int gfx_ge_farclip_mode(void) {
  #include "gfx_roomcache.inl"
  
  static void gfx_sp_tri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx, bool is_rect) {
@@ -165,10 +172,59 @@ index 8900755..2f77332 100644
 +        }
 +    }
 +#endif
++    PSEC(2);
      ge_flush_origin = is_rect ? 1u : (ge_tri_origin & 15u);
      roc_stat_tri_origin[ge_flush_origin]++;
      struct LoadedVertex* v1 = &rsp.loaded_vertices[vtx1_idx];
-@@ -4740,19 +4854,65 @@ ndcprobe_done:;
+@@ -3768,6 +3890,7 @@ static void gfx_sp_tri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx, bo
+                 break;
+         }
+     }
++    PSEC(3);
+     ge_tris_drawn++;
+ 
+     { /* GE HW pacing: this triangle's RDP fill at the console's 320x240 (the
+@@ -3799,6 +3922,7 @@ static void gfx_sp_tri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx, bo
+         }
+     }
+ 
++    PSEC(4);
+     { /* GE_FARDBG=1: census of triangles drawn entirely past the far plane (z/w
+        * > 1 on all three verts), which are the ones the far-clip change now
+        * rasterises. It prints one line per unique state (fog inputs and
+@@ -3906,6 +4030,7 @@ static void gfx_sp_tri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx, bo
+ ndcprobe_done:;
+     }
+ 
++    PSEC(5);
+     if (rdp.viewport_or_scissor_changed) {
+         if (memcmp(&rdp.viewport, &rendering_state.viewport, sizeof(rdp.viewport)) != 0) {
+             gfx_flush();
+@@ -3944,6 +4069,7 @@ ndcprobe_done:;
+         bool dec_pull;
+         float dec_pull_b;
+     } ts;
++    PSEC(6);
+     const uint32_t ts_fp = (is_rect ? 1u : 0u) | (s_DrawingRect ? 2u : 0u) | (ge_sky_tri_active ? 4u : 0u)
+         | (ge_sky_persw_active ? 8u : 0u) | (fbActive ? 16u : 0u) | (ge_sky_pixdiv_active ? 32u : 0u)
+         /* TWO bits: mode 2 ("trilinear") mips draws mode 1 does not, so
+@@ -4525,6 +4651,7 @@ ndcprobe_done:;
+     ts.prg = prg; ts.num_inputs = num_inputs; ts.clip_parameters = clip_parameters;
+     ts.dec_pull = dec_pull; ts.dec_pull_b = dec_pull_b;
+     } /* ts_recompute */
++    PSEC(7);
+     const bool dxlu_capture = gfx_dxlu_enabled() && !dxlu_closed
+         && use_alpha && depth_test && depth_compare && !depth_update
+         && dxlu_num_tris < DXLU_MAX_TRIS && dxlu_num_states < DXLU_MAX_STATES;
+@@ -4575,6 +4702,7 @@ ndcprobe_done:;
+             }
+         }
+     }
++    PSEC(8);
+     const uint32_t roc_vstart = buf_vbo_len;
+     int roc_fog_ofs = -1, roc_pixfog_ofs = -1;
+     /* Everything constant for the triangle (tile parameters, fog / grayscale /
+@@ -4740,19 +4868,66 @@ ndcprobe_done:;
          }
      }
  
@@ -212,6 +268,7 @@ index 8900755..2f77332 100644
 +        }
 +    }
 +#endif
++    PSEC(9);
 +    /* indice local: buf_vbo_len e global e, com -fno-strict-aliasing, o compilador o recarregaria e regravaria
 +     * a cada float escrito (load-hit-store no PPC em ordem). */
 +    size_t vl = buf_vbo_len;
@@ -238,7 +295,7 @@ index 8900755..2f77332 100644
  
          for (int t = 0; t < 2; t++) {
              if (!used_textures[t]) {
-@@ -4769,39 +4929,39 @@ ndcprobe_done:;
+@@ -4769,39 +4944,39 @@ ndcprobe_done:;
                  u = (v_arr[i]->u * tc_su[t] - tc_bu[t]) * tc_p[t] + tc_c[t];
                  v = (v_arr[i]->v * tc_sv[t] - tc_bv[t]) * tc_p[t] + tc_c[t];
              }
@@ -295,7 +352,7 @@ index 8900755..2f77332 100644
          }
  
          for (int j = 0; j < num_inputs; j++) {
-@@ -4845,16 +5005,17 @@ ndcprobe_done:;
+@@ -4845,16 +5020,18 @@ ndcprobe_done:;
                          break;
                  }
                  if (k == 0) {
@@ -314,10 +371,27 @@ index 8900755..2f77332 100644
      }
  
 +    buf_vbo_len = vl;
++    PSEC(10);
      if (roc_capturing != nullptr && !roc_capture_bad) {
          if (is_rect) {
              roc_capture_bad = true;
-@@ -7629,6 +7790,18 @@ static void gfx_run_dl(Gfx* cmd) {
+@@ -4873,6 +5050,7 @@ ndcprobe_done:;
+         return;
+     }
+ 
++    PSEC(11);
+     if (dxlu_capture) {
+         const uint32_t nf = buf_vbo_len - dxlu_start;
+         if (nf <= 3 * DXLU_MAX_VERT_FLOATS && dxlu_vbo_len + nf <= DXLU_MAX_FLOATS) {
+@@ -5030,6 +5208,7 @@ ndcprobe_done:;
+         }
+     }
+ 
++    PSEC(12);
+     if (++buf_vbo_num_tris == MAX_BUFFERED) {
+         gfx_flush();
+     }
+@@ -7629,6 +7808,18 @@ static void gfx_run_dl(Gfx* cmd) {
                      }
                      fflush(stderr);
                  }
@@ -336,7 +410,7 @@ index 8900755..2f77332 100644
                  sysFatalError("Unknown GBI opcode 0x%02x at %p.\nw0 %08x\nw1 %08x", opcode, cmd, cmd->words.w0, cmd->words.w1);
                  break;
          }
-@@ -7816,6 +7989,7 @@ extern "C" unsigned long long g_PortGfxRunT0Us = 0; /* hitchlog.c: this frame's
+@@ -7816,6 +8007,7 @@ extern "C" unsigned long long g_PortGfxRunT0Us = 0; /* hitchlog.c: this frame's
  extern "C" unsigned gfx_opengl_poll_gl_error(void); /* gfx_opengl.cpp */
  
  extern "C" void gfx_run(Gfx* commands) {

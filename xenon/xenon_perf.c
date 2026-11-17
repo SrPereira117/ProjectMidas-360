@@ -85,8 +85,45 @@ void xperf_flush_if_due(void)
     }
 }
 
+/* Amostrador de secoes: o jogo marca em ge_prof_sec em que trecho do Fast3D esta; esta thread le o marcador
+ * ~a cada 100 us e conta. A cada 10 s grava "# prof" no CSV com a porcentagem por secao. */
+volatile int ge_prof_sec;
+static uint32_t g_prof_hist[32];
+static void *prof_thread(void *arg)
+{
+    double last = now_s();
+    (void)arg;
+    for (;;) {
+        struct timespec ts = {0, 100000};
+        int sec;
+        nanosleep(&ts, NULL);
+        sec = ge_prof_sec;
+        if (sec < 0 || sec > 31) sec = 31;
+        g_prof_hist[sec]++;
+        if (now_s() - last >= 10.0) {
+            uint32_t tot = 0;
+            char line[400];
+            int n = 0, i;
+            for (i = 0; i < 32; i++) tot += g_prof_hist[i];
+            n = snprintf(line, sizeof line, "# prof t=%.0f amostras=%u", now_s() - g_t0, tot);
+            for (i = 0; i < 32 && tot; i++) {
+                if (g_prof_hist[i] * 200 >= tot && n < 215)   /* >= 0,5% */
+                    n += snprintf(line + n, sizeof line - n, " s%d=%.1f%%", i, 100.0 * g_prof_hist[i] / tot);
+                g_prof_hist[i] = 0;
+            }
+            put("%s\n", line);
+            last = now_s();
+        }
+    }
+    return NULL;
+}
+
 void xperf_init(void)
 {
+    {
+        pthread_t th;
+        if (pthread_create(&th, NULL, prof_thread, NULL) == 0) pthread_detach(th);
+    }
     g_file = fopen("game:/midas_perf.csv", "wb");
     g_t0 = g_sec_start = g_last_flush = now_s();
     if (!g_file) {
