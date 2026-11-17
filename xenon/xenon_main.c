@@ -260,14 +260,12 @@ int main(int argc, char **argv)
                         "ROM NAO confere com o cartucho (U) original (modificada, outra regiao ou copia ruim)");
     free(rom);
 
-    flag = fopen("game:/run.txt", "rb");
-    if (!flag || !ok) {
-        if (flag) fclose(flag);
-        xsdk_log_write("xenon: fim do teste (crie run.txt ao lado do .xex para iniciar o nucleo)");
-        return ok ? 0 : 3;
+    if (!ok) {
+        xsdk_log_write("xenon: ROM invalida: o jogo nao inicia (use GoldenEye 007 (USA), 12 MB, .z64)");
+        return 3;
     }
-    fclose(flag);
-    xsdk_log_write("xenon: run.txt encontrado: iniciando o nucleo do jogo");
+    (void)flag;
+    xsdk_log_write("xenon: ROM OK: iniciando o jogo");
     /* Padroes do 360, gravados so se o midas.ini ainda nao existe (o jogo cria um para PC, a 120 Hz). */
     {
         FILE *ini = fopen("game:/midas.ini", "rb");

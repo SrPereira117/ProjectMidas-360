@@ -84,18 +84,18 @@ jobs:
       - name: Resolver enderecos de falha (xenon/resolve.txt)
         if: always()
         run: |
-          if [ -s xenon/resolve.txt ] && [ -f build-midas/midas_xenon ]; then
+          if [ -s xenon/resolve.txt ] && [ -f build-midas/ProjectMidas360 ]; then
             echo "##### ENDERECOS -> FUNCAO"
             while read -r a; do
-              [ -n "$a" ] && echo "$a -> $("$PREFIX/bin/powerpc-xsdk-elf-addr2line" -f -C -e build-midas/midas_xenon "$a" | tr '\n' ' ')"
+              [ -n "$a" ] && echo "$a -> $("$PREFIX/bin/powerpc-xsdk-elf-addr2line" -f -C -e build-midas/ProjectMidas360 "$a" | tr '\n' ' ')"
             done < xenon/resolve.txt
             echo "##### DESMONTAGEM AO REDOR DO PRIMEIRO ENDERECO"
             first=$(head -1 xenon/resolve.txt)
             lo=$(printf "0x%X" $(( 0x$first - 0x90 ))); hi=$(printf "0x%X" $(( 0x$first + 0x20 )))
-            "$PREFIX/bin/powerpc-xsdk-elf-objdump" -d --start-address=$lo --stop-address=$hi build-midas/midas_xenon | tail -n +7
+            "$PREFIX/bin/powerpc-xsdk-elf-objdump" -d --start-address=$lo --stop-address=$hi build-midas/ProjectMidas360 | tail -n +7
             echo "##### SIMBOLOS VIZINHOS DO PRIMEIRO ENDERECO"
             first=$(head -1 xenon/resolve.txt)
-            "$PREFIX/bin/powerpc-xsdk-elf-nm" -n build-midas/midas_xenon | awk -v a="$first" 'BEGIN{t=strtonum(a)} {v=strtonum("0x"$1); if(v<=t){p3=p2;p2=p1;p1=$0} else if(!d){print p3;print p2;print p1;print $0;d=1}}'
+            "$PREFIX/bin/powerpc-xsdk-elf-nm" -n build-midas/ProjectMidas360 | awk -v a="$first" 'BEGIN{t=strtonum(a)} {v=strtonum("0x"$1); if(v<=t){p3=p2;p2=p1;p1=$0} else if(!d){print p3;print p2;print p1;print $0;d=1}}'
           else
             echo "sem enderecos em xenon/resolve.txt: nada a resolver"
           fi
@@ -104,6 +104,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: midas-xenon-xex
-          path: build-midas/midas_xenon.xex
+          name: ProjectMidas360-xex
+          path: build-midas/ProjectMidas360.xex
           if-no-files-found: warn

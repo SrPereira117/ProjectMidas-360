@@ -16,7 +16,7 @@ Base: Project Midas 1.0.2b (port de PC) + xsdk (SDK/compilador para `.xex`, GCC 
 ## Marcos (cada um termina com um log para eu ler)
 
 1. **Mapa de compilação** (`midas-360-compile-check`): quais arquivos compilam com o GCC do xsdk. *(feito: 238 de 246 passam na checagem de sintaxe; os 8 que falham são da camada de port: SDL, mman, execinfo)*
-2. **Núcleo compila e liga**: jogo + motor + libultra, sem vídeo, ainda sem rodar. *(feito: gera `midas_xenon.xex`)*
+2. **Núcleo compila e liga**: jogo + motor + libultra, sem vídeo, ainda sem rodar. *(feito: gera `ProjectMidas360.xex`)*
 3. **ROM carrega**: o `.xex` acha a ROM no pendrive, confere e grava um log. *(pronto para testar no console)*
 4. **Núcleo roda sem imagem**: o jogo avança frames, com log.
 5. **Vídeo**: backend de renderização no Xenos; primeira tela (logos/menu).

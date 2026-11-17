@@ -7,7 +7,7 @@
 # de plataforma do 360 nao existe. Sem GE_ROMDATA_FALLBACK: o executavel nao carrega
 # os dados grandes do jogo; eles vem da ROM do usuario.
 cmake_minimum_required(VERSION 3.25)
-project(midas_xenon C CXX)
+project(ProjectMidas360 C CXX)
 
 set(MIDAS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../midas" CACHE PATH "Pasta do Project Midas")
 get_filename_component(MIDAS_DIR "${MIDAS_DIR}" ABSOLUTE)
@@ -161,19 +161,19 @@ target_include_directories(midas_gfx PRIVATE ${MIDAS_DIR} ${MIDAS_DIR}/include $
     ${CMAKE_CURRENT_SOURCE_DIR})
 
 # --- O programa ---------------------------------------------------------------------
-add_executable(midas_xenon ${GAME_SRC} ${ENGINE_SRC} ${GU_SRC} ${PORT_SRC}
+add_executable(ProjectMidas360 ${GAME_SRC} ${ENGINE_SRC} ${GU_SRC} ${PORT_SRC}
                ${MIDAS_DIR}/src/libultrare/io/vitbl.c ${LOOSE_SRC} ${KEEP_OBJS}
                ${CMAKE_CURRENT_SOURCE_DIR}/xenon_stubs.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_audio.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_perf.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_log.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_input.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_main.c)
-target_compile_definitions(midas_xenon PRIVATE ${MIDAS_DEFS})
-target_compile_options(midas_xenon PRIVATE ${MIDAS_CFLAGS})
-target_include_directories(midas_xenon PRIVATE ${MIDAS_INCS}
+target_compile_definitions(ProjectMidas360 PRIVATE ${MIDAS_DEFS})
+target_compile_options(ProjectMidas360 PRIVATE ${MIDAS_CFLAGS})
+target_include_directories(ProjectMidas360 PRIVATE ${MIDAS_INCS}
     ${CMAKE_CURRENT_SOURCE_DIR}/compat ${CMAKE_BINARY_DIR}/generated)
 # A strtol do jogo (src/str.c) colide com a da newlib; as chamadas passam a usar a da newlib,
 # que se comporta igual para esses usos (argumentos de linha de comando e stan.c).
 set_source_files_properties(${MIDAS_DIR}/src/str.c PROPERTIES COMPILE_DEFINITIONS "strtol=midas_strtol")
 # A main() do Midas vira midas_main(); a nossa (xenon_main.c) acha a ROM e chama a dele.
 set_source_files_properties(${MIDAS_DIR}/port/src/main.c PROPERTIES COMPILE_DEFINITIONS "main=midas_main")
-target_link_libraries(midas_xenon midas_gfx midas_gfx m)
+target_link_libraries(ProjectMidas360 midas_gfx midas_gfx m)
 # log assincrono (xenon_log.c): o pendrive pode levar segundos numa gravacao pequena
-target_link_options(midas_xenon PRIVATE -Wl,--wrap=xsdk_log_write -Wl,--wrap=xsdk_log_write_bytes)
-xsdk_add_xex(midas_xenon TITLE_ID 0x47454D44 NAME "GoldenEye Midas" VERSION 0.0.1.0)
+target_link_options(ProjectMidas360 PRIVATE -Wl,--wrap=xsdk_log_write -Wl,--wrap=xsdk_log_write_bytes)
+xsdk_add_xex(ProjectMidas360 TITLE_ID 0x47454D44 NAME "ProjectMidas360" VERSION 1.0.0.0)
