@@ -1,5 +1,6 @@
 #include "xenon_perf.h"
 #include <stdarg.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +14,9 @@ static char g_buf[BUF_BYTES];
 static size_t g_len;
 static FILE *g_file;
 static double g_t0, g_last_flush, g_flush_ms;
+static pthread_mutex_t g_mu = PTHREAD_MUTEX_INITIALIZER;
+static volatile int g_flush_due;
+static char g_copy[BUF_BYTES];
 
 /* acumuladores do segundo atual */
 static double g_sec_start, g_frame_begin, g_last_end;
@@ -35,23 +39,42 @@ static void put(const char *fmt, ...)
 {
     va_list ap;
     int n;
-    if (g_len + 256 > BUF_BYTES) return; /* cheio: descarta (flush a cada 20 s evita isso) */
+    pthread_mutex_lock(&g_mu);
+    if (g_len + 256 > BUF_BYTES) { /* cheio: descarta (flush a cada 20 s evita isso) */
+        pthread_mutex_unlock(&g_mu);
+        return;
+    }
     va_start(ap, fmt);
     n = vsnprintf(g_buf + g_len, 256, fmt, ap);
     va_end(ap);
     if (n > 0) g_len += (size_t)(n < 255 ? n : 255);
+    pthread_mutex_unlock(&g_mu);
 }
 
 void xperf_flush(void)
 {
     double t0;
-    if (!g_file || g_len == 0) return;
+    size_t n;
+    if (!g_file) return;
+    pthread_mutex_lock(&g_mu);
+    n = g_len;
+    memcpy(g_copy, g_buf, n);
+    g_len = 0;
+    pthread_mutex_unlock(&g_mu);
+    if (n == 0) return;
     t0 = now_s();
-    fwrite(g_buf, 1, g_len, g_file);
+    fwrite(g_copy, 1, n, g_file);
     fflush(g_file);
     g_flush_ms = (now_s() - t0) * 1000.0;
-    g_len = 0;
     g_last_flush = now_s();
+}
+
+void xperf_flush_if_due(void)
+{
+    if (g_flush_due) {
+        g_flush_due = 0;
+        xperf_flush();
+    }
 }
 
 void xperf_init(void)
@@ -142,7 +165,7 @@ void xperf_frame_end(uint64_t draws, uint64_t tris, uint64_t uploads, uint64_t s
         g_n = 0; g_sum_ms = g_max_ms = g_sum_render_ms = 0.0;
         g_sec_start = t;
     }
-    if (t - g_last_flush >= FLUSH_EVERY_S) xperf_flush();
+    if (t - g_last_flush >= FLUSH_EVERY_S) g_flush_due = 1;
 }
 
 void xperf_acc(int id, double ms)

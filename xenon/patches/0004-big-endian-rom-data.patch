@@ -236,6 +236,58 @@ index a000748..772be61 100644
      {
          printf("ge: frame %u | gfx tasks submitted %u\n",
                 g_PortFramesPumped, g_PortGfxTasksSubmitted);
+diff --git a/port/src/port_textures.c b/port/src/port_textures.c
+index 086c5e5..824960a 100644
+--- a/port/src/port_textures.c
++++ b/port/src/port_textures.c
+@@ -54,6 +54,7 @@
+  * back to Base/ per texture, and Base/ falls back to the ROM.
+  */
+ #include <stdio.h>
++#include <dirent.h>
+ #include <stdint.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -268,6 +269,39 @@ static s32 texReadBmpFile(const char *dir, const char *name, s32 maxside, s32 *w
+     long len;
+     u8 *file;
+ 
++#if !defined(_WIN32)
++    {
++        /* console: a failed open on a USB stick costs milliseconds and a level asks for hundreds of
++         * textures. Look once at whether the folder holds any .bmp at all. */
++        static s32 sHas[2] = { -1, -1 };
++        const s32 which = (strcmp(dir, PORT_TEX_DIR_OPTIONS) == 0) ? 1 : 0;
++        if (sHas[which] < 0)
++        {
++            DIR *d;
++            struct dirent *e;
++            sHas[which] = 0;
++            snprintf(rel, sizeof(rel), "%s", dir);
++            d = opendir(portRootPath(rel));
++            if (d != NULL)
++            {
++                while ((e = readdir(d)) != NULL)
++                {
++                    const size_t n = strlen(e->d_name);
++                    if (n > 4 && strcmp(e->d_name + n - 4, ".bmp") == 0)
++                    {
++                        sHas[which] = 1;
++                        break;
++                    }
++                }
++                closedir(d);
++            }
++        }
++        if (!sHas[which])
++        {
++            return 0;
++        }
++    }
++#endif
+     snprintf(rel, sizeof(rel), "%s/%s.bmp", dir, name);
+     path = portRootPath(rel);
+     f = fopen(path, "rb");
 diff --git a/port/src/romdata.c b/port/src/romdata.c
 index 5af83d8..22e19ce 100644
 --- a/port/src/romdata.c

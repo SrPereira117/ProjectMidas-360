@@ -12,6 +12,10 @@ void xperf_note_rom_read(uint32_t bytes, double ms);      /* tempo real da leitu
 void xperf_frame_begin(void);
 void xperf_frame_end(uint64_t draws, uint64_t tris, uint64_t uploads, uint64_t shaders);
 void xperf_flush(void);
+void xperf_flush_if_due(void);           /* chamado pela thread do log, fora do jogo */
+void xlog_async_start(void);
+void xlog_async_flush(void);
+void xlog_async_sync(void);
 /* tempo acumulado por categoria (0 submit, 1 present, 2 textura, 3 conversao de DL) em ms */
 void xperf_acc(int id, double ms);
 double xperf_now_ms(void);

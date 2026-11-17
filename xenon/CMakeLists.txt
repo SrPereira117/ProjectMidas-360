@@ -160,7 +160,7 @@ target_include_directories(midas_gfx PRIVATE ${MIDAS_DIR} ${MIDAS_DIR}/include $
 # --- O programa ---------------------------------------------------------------------
 add_executable(midas_xenon ${GAME_SRC} ${ENGINE_SRC} ${GU_SRC} ${PORT_SRC}
                ${MIDAS_DIR}/src/libultrare/io/vitbl.c ${LOOSE_SRC} ${KEEP_OBJS}
-               ${CMAKE_CURRENT_SOURCE_DIR}/xenon_stubs.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_audio.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_perf.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_input.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_main.c)
+               ${CMAKE_CURRENT_SOURCE_DIR}/xenon_stubs.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_audio.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_perf.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_log.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_input.c ${CMAKE_CURRENT_SOURCE_DIR}/xenon_main.c)
 target_compile_definitions(midas_xenon PRIVATE ${MIDAS_DEFS})
 target_compile_options(midas_xenon PRIVATE ${MIDAS_CFLAGS})
 target_include_directories(midas_xenon PRIVATE ${MIDAS_INCS}
@@ -171,4 +171,6 @@ set_source_files_properties(${MIDAS_DIR}/src/str.c PROPERTIES COMPILE_DEFINITION
 # A main() do Midas vira midas_main(); a nossa (xenon_main.c) acha a ROM e chama a dele.
 set_source_files_properties(${MIDAS_DIR}/port/src/main.c PROPERTIES COMPILE_DEFINITIONS "main=midas_main")
 target_link_libraries(midas_xenon midas_gfx midas_gfx m)
+# log assincrono (xenon_log.c): o pendrive pode levar segundos numa gravacao pequena
+target_link_options(midas_xenon PRIVATE -Wl,--wrap=xsdk_log_write -Wl,--wrap=xsdk_log_write_bytes)
 xsdk_add_xex(midas_xenon TITLE_ID 0x47454D44 NAME "GoldenEye Midas" VERSION 0.0.1.0)

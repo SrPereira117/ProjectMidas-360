@@ -50,6 +50,8 @@ static int fault_handler(void **ptrs)
 
     if (in_fault) XamLoaderTerminateTitle();
     in_fault = 1;
+    xlog_async_flush();
+    xlog_async_sync();
     rec = ptrs[0];
     ctx = ptrs[1];
     xsdk_log_write("FALHA: codigo %08X, instrucao em %08X, %u parametros",
@@ -227,6 +229,7 @@ int main(int argc, char **argv)
     int ok = 0;
 
     xsdk_log_write("xenon: GoldenEye (Project Midas) para Xbox 360, build %s %s", __DATE__, __TIME__);
+    xlog_async_start();
     xperf_init();
     xperf_usb_benchmark();
     xsdk_log_write("xenon: argc=%d argv[0]=%s", argc, argc > 0 && argv[0] ? argv[0] : "(nulo)");
