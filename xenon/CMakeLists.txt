@@ -151,7 +151,10 @@ add_library(midas_gfx STATIC ${MIDAS_DIR}/port/fast3d/gfx_pc.cpp ${MIDAS_DIR}/po
 target_link_libraries(midas_gfx PUBLIC glslang SPIRV glslang-default-resource-limits)
 set_property(TARGET midas_gfx PROPERTY CXX_STANDARD 20)
 target_compile_definitions(midas_gfx PRIVATE ${MIDAS_DEFS})
-target_compile_options(midas_gfx PRIVATE -fno-strict-aliasing -fwrapv -funsigned-char -ffp-contract=off -O2 -w)
+# Codigo grafico (Fast3D): so desenha, nao precisa dos floats bit-exatos do N64.
+# FMA + sem errno/traps + O3 = menos instrucoes por vertice (o gargalo medido era CPU no Fast3D).
+target_compile_options(midas_gfx PRIVATE -fno-strict-aliasing -fwrapv -funsigned-char
+                       -ffp-contract=fast -fno-math-errno -fno-trapping-math -O3 -w)
 target_include_directories(midas_gfx PRIVATE ${MIDAS_DIR} ${MIDAS_DIR}/include ${MIDAS_DIR}/include/ultra64
     ${MIDAS_DIR}/include/PR ${MIDAS_DIR}/port/include ${MIDAS_DIR}/port/fast3d
     ${CMAKE_CURRENT_SOURCE_DIR}/compat ${CMAKE_BINARY_DIR}/generated ${MIDAS_DIR}/src/game
