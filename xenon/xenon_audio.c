@@ -123,3 +123,8 @@ uint32_t SDL_GetQueuedAudioSize(SDL_AudioDeviceID dev)
     pthread_mutex_unlock(&g_lock);
     return c;
 }
+
+uint32_t xenon_audio_underruns(void)
+{
+    return g_underruns;
+}

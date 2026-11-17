@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include "xenon_perf.h"
 #include <map>
 #include <string>
 #include <utility>
@@ -740,6 +741,7 @@ void r_on_resize() {}
 
 void r_start_frame()
 {
+    xperf_frame_begin();
     g_frame_count++;
     if (!g_ready) return;
     release_passed();
@@ -748,6 +750,7 @@ void r_start_frame()
 void r_end_frame()
 {
     g_frames++;
+    xperf_frame_end(g_draws, g_tris, g_uploads, g_shaders_compiled);
     {   /* picos de tempo de quadro: o log diz o que aquele quadro fez */
         static double last = 0.0;
         static uint64_t pd, pt, pu, ps, said;

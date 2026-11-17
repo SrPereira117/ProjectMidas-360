@@ -9,6 +9,8 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <time.h>
+#include "xenon_perf.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -146,7 +148,13 @@ static uint8_t *load_rom(const char *path, const char **format)
         free(buf);
         return NULL;
     }
-    got = fread(buf, 1, ROM_SIZE, f);
+    {
+        struct timespec a, b;
+        clock_gettime(CLOCK_MONOTONIC, &a);
+        got = fread(buf, 1, ROM_SIZE, f);
+        clock_gettime(CLOCK_MONOTONIC, &b);
+        xperf_note_rom_read((uint32_t)got, ((double)(b.tv_sec - a.tv_sec) + (double)(b.tv_nsec - a.tv_nsec) * 1e-9) * 1000.0);
+    }
     fclose(f);
     if (got != ROM_SIZE) {
         xsdk_log_write("xenon: leitura curta: %u de %u bytes", (unsigned)got, (unsigned)ROM_SIZE);
@@ -219,6 +227,8 @@ int main(int argc, char **argv)
     int ok = 0;
 
     xsdk_log_write("xenon: GoldenEye (Project Midas) para Xbox 360, build %s %s", __DATE__, __TIME__);
+    xperf_init();
+    xperf_usb_benchmark();
     xsdk_log_write("xenon: argc=%d argv[0]=%s", argc, argc > 0 && argv[0] ? argv[0] : "(nulo)");
     crc32_init();
 
