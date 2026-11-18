@@ -5,6 +5,10 @@ on:
   workflow_dispatch:
   push:
     branches: [midas-360]
+    tags: ['v*']
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -107,3 +111,24 @@ jobs:
           name: ProjectMidas360-xex
           path: build-midas/ProjectMidas360.xex
           if-no-files-found: warn
+
+      - name: Publicar a Release (so em tag v*)
+        if: startsWith(github.ref, 'refs/tags/v') && hashFiles('build-midas/ProjectMidas360.xex') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p rel/ProjectMidas360
+          cp build-midas/ProjectMidas360.xex rel/ProjectMidas360/
+          cp xenon/midas.ini.example rel/ProjectMidas360/midas.ini.example
+          cat > rel/ProjectMidas360/LEIA-ME.txt <<'EOF'
+          Project Midas 360 (GoldenEye 007 para Xbox 360)
+          1. Copie esta pasta para o pendrive/HD.
+          2. Coloque dentro dela a SUA ROM de GoldenEye 007 (USA), 12 MB (.z64/.v64/.n64), com qualquer nome.
+          3. Abra ProjectMidas360.xex pelo Aurora/Freestyle.
+          Segure BACK por 2 s para sair. midas.ini.example e opcional (renomeie para midas.ini para personalizar).
+          Este pacote nao contem ROM nem arquivos do jogo.
+          EOF
+          (cd rel && zip -r ../ProjectMidas360.zip ProjectMidas360)
+          awk '/^## /{n++} n==1' CHANGELOG.md > notes.md
+          gh release create "${GITHUB_REF_NAME}" --title "Project Midas 360 ${GITHUB_REF_NAME}" --notes-file notes.md \
+            build-midas/ProjectMidas360.xex ProjectMidas360.zip
