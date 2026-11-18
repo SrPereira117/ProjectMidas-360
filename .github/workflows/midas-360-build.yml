@@ -3,6 +3,11 @@ name: midas-360-build
 # Compila e liga o Midas (sem video/audio ainda) para o 360 e mostra os erros no log.
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Para publicar uma Release, informe a versao (ex.: v1.0.0). Vazio = so compila.'
+        required: false
+        default: ''
   push:
     branches: [midas-360]
     tags: ['v*']
@@ -113,9 +118,10 @@ jobs:
           if-no-files-found: warn
 
       - name: Publicar a Release (so em tag v*)
-        if: startsWith(github.ref, 'refs/tags/v') && hashFiles('build-midas/ProjectMidas360.xex') != ''
+        if: (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && hashFiles('build-midas/ProjectMidas360.xex') != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           mkdir -p rel/ProjectMidas360
           cp build-midas/ProjectMidas360.xex rel/ProjectMidas360/
@@ -130,5 +136,5 @@ jobs:
           EOF
           (cd rel && zip -r ../ProjectMidas360.zip ProjectMidas360)
           awk '/^## /{n++} n==1' CHANGELOG.md > notes.md
-          gh release create "${GITHUB_REF_NAME}" --title "Project Midas 360 ${GITHUB_REF_NAME}" --notes-file notes.md \
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "Project Midas 360 $TAG" --notes-file notes.md \
             build-midas/ProjectMidas360.xex ProjectMidas360.zip
